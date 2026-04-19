@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj": {}
+    "C:\\Users\\Galambi\\Desktop\\sarif\\SarifBackend1\\Backend.csproj": {}
   },
   "projects": {
-    "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj": {
+    "C:\\Users\\Galambi\\Desktop\\sarif\\SarifBackend1\\Backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+        "projectUniqueName": "C:\\Users\\Galambi\\Desktop\\sarif\\SarifBackend1\\Backend.csproj",
         "projectName": "Backend",
-        "projectPath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
-        "packagesPath": "C:\\Users\\Eng Kahiye\\.nuget\\packages\\",
-        "outputPath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\obj\\",
+        "projectPath": "C:\\Users\\Galambi\\Desktop\\sarif\\SarifBackend1\\Backend.csproj",
+        "packagesPath": "C:\\Users\\Galambi\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Galambi\\Desktop\\sarif\\SarifBackend1\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\Eng Kahiye\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Galambi\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -154,6 +154,24 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.15, 9.0.15]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[9.0.15, 9.0.15]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[9.0.15, 9.0.15]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[9.0.15, 9.0.15]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -162,7 +180,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
