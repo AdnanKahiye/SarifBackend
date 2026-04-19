@@ -9,6 +9,9 @@ namespace Backend.DTOs.Requests.Accounts
         public string Name { get; set; } = string.Empty;
 
         [Required]
+
+//wAXAA KUSO DAREY FADLAN LASOO DEG
+
         public int AccountType { get; set; }
 
         public Guid? ReferenceId { get; set; }
