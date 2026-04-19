@@ -1,0 +1,3973 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Backend",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/Account/currency": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCurrencyDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCurrencyDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCurrencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/currency/{id}": {
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCurrencyDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCurrencyDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCurrencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/exchange-rate": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExchangeRateDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExchangeRateDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExchangeRateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/exchange-rate/{id}": {
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExchangeRateDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExchangeRateDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExchangeRateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/account": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/account/{id}": {
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/balances-summary": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/account-statement/{id}": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/transaction": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransactionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransactionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/transaction/{id}": {
+      "put": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransactionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransactionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTransactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/exchanges": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/transfers": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/loans": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/expenses": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/deposits": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/withdrawals": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/loanPayment": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Account/revinues": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequests"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequests"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/google-login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/create-user": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Auth/refresh-token": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Backend"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Customer/customer": {
+      "post": {
+        "tags": [
+          "Customer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Customer"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Customer/customer/{id}": {
+      "put": {
+        "tags": [
+          "Customer"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Customer"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Emails/send": {
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Emails/verify": {
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/agency": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgencyDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgencyDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/agency/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgencyDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgencyDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/branch": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/branch/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBranchDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBranchDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBranchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menu": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menu-summary": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menu/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/module": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModuleDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModuleDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/module/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModuleDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModuleDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menu-permission": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuPermissionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuPermissionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuPermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menus-summary": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/menu-permission/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuPermissionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuPermissionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuPermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/role-permission": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRolePermissionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRolePermissionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRolePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/role-permission/{id}": {
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/permission": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Setup/permission/{id}": {
+      "put": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Setup"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plan": {
+      "post": {
+        "tags": [
+          "Subscription"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlanDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlanDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plans": {
+      "get": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plan/{id}": {
+      "put": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlanDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlanDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plan/permissions": {
+      "post": {
+        "tags": [
+          "Subscription"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermissionsToPlanDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermissionsToPlanDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermissionsToPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plan/permissions/{planId}": {
+      "put": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionsToPlanDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionsToPlanDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionsToPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/plan/permissions/{id}": {
+      "delete": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/subscription": {
+      "post": {
+        "tags": [
+          "Subscription"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubscriptionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubscriptionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubscriptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/subscriptions": {
+      "get": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Subscription/subscription/{id}": {
+      "put": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriptionDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriptionDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/Create-user": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/update-user/{id}": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/delete-user/{Id}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "Id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/get-users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/Create-role": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Users/roles": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/WeatherForecast": {
+      "get": {
+        "tags": [
+          "WeatherForecast"
+        ],
+        "operationId": "GetWeatherForecast",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeatherForecast"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeatherForecast"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeatherForecast"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignPermissionsToPlanDto": {
+        "required": [
+          "permissionIds",
+          "planId"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "permissionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAccountDto": {
+        "required": [
+          "accountType",
+          "currencyId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "accountType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAgencyDto": {
+        "required": [
+          "country",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "country": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 50,
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "maxLength": 255,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateBranchDto": {
+        "required": [
+          "agencyId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 255,
+            "type": "string",
+            "nullable": true
+          },
+          "isMain": {
+            "type": "boolean"
+          },
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCurrencyDto": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 10,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 10,
+            "type": "string",
+            "nullable": true
+          },
+          "decimalPlaces": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isBase": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCustomerDto": {
+        "required": [
+          "fullName",
+          "phoneNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "gender": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "email": {
+            "maxLength": 150,
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altPhoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateDepositDto": {
+        "required": [
+          "accountId",
+          "agencyId",
+          "branchId",
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "depositNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateExchangeRateDto": {
+        "required": [
+          "currencyId",
+          "rate"
+        ],
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateExpenseDto": {
+        "required": [
+          "accountId",
+          "amount",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expenseDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateLoanDto": {
+        "required": [
+          "accountId",
+          "customerId",
+          "principalAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "loanNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "principalAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "interestRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "paidAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateMenuDto": {
+        "required": [
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "href": {
+            "maxLength": 200,
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "orderNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "moduleId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateMenuPermissionDto": {
+        "required": [
+          "menuId",
+          "permissionIds"
+        ],
+        "type": "object",
+        "properties": {
+          "menuId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "permissionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateModuleDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatePermissionDto": {
+        "required": [
+          "keyName",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "keyName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatePlanDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "durationInDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRepaymentDto": {
+        "required": [
+          "amount",
+          "cashAccountId",
+          "loanAccountId",
+          "loanId"
+        ],
+        "type": "object",
+        "properties": {
+          "loanId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loanAccountId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRolePermissionDto": {
+        "required": [
+          "permissionIds",
+          "roleId"
+        ],
+        "type": "object",
+        "properties": {
+          "roleId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "permissionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateRoleRequest": {
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateSubscriptionDto": {
+        "type": "object",
+        "properties": {
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateTransactionDetailDto": {
+        "required": [
+          "accountId",
+          "amount",
+          "currencyId",
+          "entryType"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "entryType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateTransactionDto": {
+        "required": [
+          "details",
+          "transactionType"
+        ],
+        "type": "object",
+        "properties": {
+          "transactionType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "exchangeRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "fee": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "profit": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTransactionDetailDto"
+            }
+          },
+          "transferDetails": {
+            "$ref": "#/components/schemas/CreateTransferDto"
+          },
+          "loanDetails": {
+            "$ref": "#/components/schemas/CreateLoanDto"
+          },
+          "expenseDetails": {
+            "$ref": "#/components/schemas/CreateExpenseDto"
+          },
+          "depositDetails": {
+            "$ref": "#/components/schemas/CreateDepositDto"
+          },
+          "withdrawDetails": {
+            "$ref": "#/components/schemas/CreateWithdrawDto"
+          },
+          "repaymentDetails": {
+            "$ref": "#/components/schemas/CreateRepaymentDto"
+          },
+          "revenueDetails": {
+            "$ref": "#/components/schemas/RevenueDetailsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateTransferDto": {
+        "required": [
+          "fromAccountId",
+          "toAccountId"
+        ],
+        "type": "object",
+        "properties": {
+          "senderName": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiverName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "fromBranchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "toBranchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "isactive": {
+            "type": "boolean"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateWithdrawDto": {
+        "required": [
+          "accountId",
+          "currencyId",
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "withdrawNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receiverName": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiverIdCard": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GoogleLoginRequest": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequests": {
+        "type": "object",
+        "properties": {
+          "usernameOrEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RevenueDetailsDto": {
+        "required": [
+          "amount",
+          "cashAccountId",
+          "revenueAccountId",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "minimum": 0.01,
+            "type": "number",
+            "format": "double"
+          },
+          "revenueAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SendOtpRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateAccountDto": {
+        "required": [
+          "accountType",
+          "currencyId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "accountType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateAgencyDto": {
+        "required": [
+          "name",
+          "phone"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "address": {
+            "maxLength": 255,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateBranchDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 255,
+            "type": "string",
+            "nullable": true
+          },
+          "isMain": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateCurrencyDto": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 10,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 10,
+            "type": "string",
+            "nullable": true
+          },
+          "decimalPlaces": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isBase": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateCustomerDto": {
+        "required": [
+          "fullName",
+          "phoneNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "gender": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "email": {
+            "maxLength": 150,
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altPhoneNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "agencyId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateExchangeRateDto": {
+        "required": [
+          "currencyId",
+          "rate"
+        ],
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "number",
+            "format": "double"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateMenuDto": {
+        "required": [
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "href": {
+            "maxLength": 200,
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "orderNo": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateMenuPermissionDto": {
+        "required": [
+          "menuId",
+          "permissionIds"
+        ],
+        "type": "object",
+        "properties": {
+          "menuId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "permissionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateModuleDto": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePermissionDto": {
+        "required": [
+          "keyName",
+          "moduleId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "keyName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "moduleId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePermissionsToPlanDto": {
+        "required": [
+          "permissionIds",
+          "planId"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "permissionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePlanDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "durationInDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSubscriptionDto": {
+        "type": "object",
+        "properties": {
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateTransactionDetailDto": {
+        "required": [
+          "accountId",
+          "amount",
+          "currencyId",
+          "entryType"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "entryType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currencyId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateTransactionDto": {
+        "required": [
+          "transactionType"
+        ],
+        "type": "object",
+        "properties": {
+          "transactionType": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "agencyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateTransactionDetailDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "userName": {
+            "type": "string",
+            "nullable": true
+          },
+          "isactive": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "newPassword": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyOtpRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WeatherForecast": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "temperatureC": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "temperatureF": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "apiKey",
+        "description": "Enter: Bearer {token}",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}
