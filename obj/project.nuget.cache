@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "foZlUASWW08=",
+  "dgSpecHash": "H0k9tGCQMNc=",
   "success": true,
-  "projectFilePath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+  "projectFilePath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Eng Kahiye\\.nuget\\packages\\automapper\\13.0.1\\automapper.13.0.1.nupkg.sha512",
     "C:\\Users\\Eng Kahiye\\.nuget\\packages\\awssdk.core\\3.7.402.60\\awssdk.core.3.7.402.60.nupkg.sha512",
@@ -200,10 +200,22 @@
       "code": "NU1903",
       "level": "Warning",
       "message": "Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x",
-      "projectPath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+      "projectPath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
       "warningLevel": 1,
-      "filePath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+      "filePath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
       "libraryId": "AutoMapper",
+      "targetGraphs": [
+        "net9.0"
+      ]
+    },
+    {
+      "code": "NU1902",
+      "level": "Warning",
+      "message": "Package 'MailKit' 4.15.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-9j88-vvj5-vhgr",
+      "projectPath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
+      "libraryId": "MailKit",
       "targetGraphs": [
         "net9.0"
       ]

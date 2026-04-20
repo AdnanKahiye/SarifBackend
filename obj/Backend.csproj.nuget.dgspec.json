@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj": {}
+    "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj": {}
   },
   "projects": {
-    "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj": {
+    "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+        "projectUniqueName": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
         "projectName": "Backend",
-        "projectPath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\Backend.csproj",
+        "projectPath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\Backend.csproj",
         "packagesPath": "C:\\Users\\Eng Kahiye\\.nuget\\packages\\",
-        "outputPath": "D:\\Developments\\Next js project\\Sarif\\Backend\\Backend\\obj\\",
+        "outputPath": "D:\\Developments\\Next js project\\Sarif\\SarifBackend\\Backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
