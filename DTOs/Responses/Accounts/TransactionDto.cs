@@ -1,12 +1,14 @@
-﻿namespace Backend.DTOs.Responses.Accounts
+﻿using Backend.Models.Accounts;
+
+namespace Backend.DTOs.Responses.Accounts
 {
     public class TransactionDto
     {
         public Guid Id { get; set; }
 
-        public int TransactionType { get; set; }
+        public TransactionTypeEnum TransactionType { get; set; }
 
-        public int Status { get; set; }
+        public TransactionStatusEnum Status { get; set; }
 
         public string? ReferenceNo { get; set; }
 

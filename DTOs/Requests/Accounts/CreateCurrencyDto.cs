@@ -12,8 +12,6 @@ namespace Backend.DTOs.Requests.Accounts
         [MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
-
-
         [MaxLength(10)]
         public string? Symbol { get; set; }
 

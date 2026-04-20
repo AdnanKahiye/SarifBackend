@@ -196,7 +196,6 @@ D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\Backend.A
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\Backend.csproj.CoreCompileInputs.cache
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\Backend.MvcApplicationPartsAssemblyInfo.cs
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\Backend.MvcApplicationPartsAssemblyInfo.cache
-D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\Backend.sourcelink.json
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\rjimswa.dswa.cache.json
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\rjsmrazor.dswa.cache.json
 D:\Developments\Next js project\Sarif\Backend\Backend\obj\Debug\net9.0\rjsmcshtml.dswa.cache.json

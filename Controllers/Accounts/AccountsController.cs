@@ -7,7 +7,7 @@ namespace Backend.Controllers.Accounts
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize] // Waxaa loo ogol yahay kaliya dadka login-ka ah
+    [Authorize]
     public class AccountController : ControllerBase
     {
         private readonly IAccountService _accountService;

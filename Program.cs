@@ -31,13 +31,12 @@ Console.WriteLine("JWT_KEY: " + Environment.GetEnvironmentVariable("JWT_KEY"));
 // =====================================================
 builder.Services.AddWebApiServices(builder.Configuration);
 
-// Controllers + enum as string
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(
-            new JsonStringEnumConverter()
-        )
-    );
+    {
+        options.JsonSerializerOptions.Converters
+            .Add(new JsonStringEnumConverter());
+    });
 
 //// =====================================================
 //// 2️⃣ CORS
