@@ -318,7 +318,7 @@ namespace Backend.Services.Accounts
                 entity.BranchId = _currentUser.BranchId;
                 entity.CreatedAt = DateTime.UtcNow;
                 entity.UpdatedAt = DateTime.UtcNow;
-
+                entity.Nature = AccountHelper.GetNature(entity.AccountType);
                 // 2. Default to current user's context if not provided
                 entity.AgencyId= _currentUser.AgencyId;
                 // Optionally handle BranchId logic here if required
@@ -1012,9 +1012,13 @@ namespace Backend.Services.Accounts
         }
 
 
-        public async Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>> GetAccountBalancesSummaryAsync(int page = 1, int pageSize = 10)
+   public async Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>> GetAccountBalancesSummaryAsync(
+     int page = 1,
+     int pageSize = 10,
+     DateTime? fromDate = null,
+     DateTime? toDate = null,
+     AccountTypeEnum? accountType = null)
         {
-            // 1. Guard Clauses (Sida kuwii hore)
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
@@ -1023,60 +1027,101 @@ namespace Backend.Services.Accounts
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{AccountCacheKey}_Summary_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ FIXED CACHE KEY
+                cacheKey: $"{AccountCacheKey}_Summary_{_currentUser.UserId}_P{page}_PS{pageSize}_T{accountType}_F{fromDate?.ToString("yyyy-MM-dd")}_TO{toDate?.ToString("yyyy-MM-dd")}",
+
                 action: async () =>
                 {
-                    // 2. Base Query ee Accounts
+                    // 1. Accounts Query
                     var query = _context.Accounts
                         .Include(x => x.Currency)
                         .AsNoTracking();
 
-                    // 3. Multi-tenant Filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
                     }
 
-                    // 4. Wadarta guud ee Records-ka (Count)
+                    if (accountType.HasValue)
+                    {
+                        query = query.Where(x => x.AccountType == accountType.Value);
+                    }
+
                     var totalRecords = await query.CountAsync();
 
-                    // 5. Pagination (Skip & Take)
                     var pagedAccounts = await query
                         .OrderBy(x => x.Name)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
                         .ToListAsync();
 
-                    // 6. Helitaanka Balances-ka (Kaliya kuwa bogga hadda ku jira)
                     var accountIds = pagedAccounts.Select(a => a.Id).ToList();
 
-                    var balances = await _context.TransactionDetails
-                        .Where(td => accountIds.Contains(td.AccountId))
+                    // 2. Transaction Query (DATE FIXED)
+                    var transactionQuery = _context.TransactionDetails
+                        .Where(td => accountIds.Contains(td.AccountId));
+
+                    if (fromDate.HasValue)
+                    {
+                        transactionQuery = transactionQuery.Where(td => td.CreatedAt >= fromDate.Value.Date);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endDate = toDate.Value.Date.AddDays(1).AddTicks(-1); // ✅ IMPORTANT FIX
+                        transactionQuery = transactionQuery.Where(td => td.CreatedAt <= endDate);
+                    }
+
+                    // 3. Group Balances
+                    var balances = await transactionQuery
                         .GroupBy(td => td.AccountId)
                         .Select(g => new
                         {
                             AccountId = g.Key,
                             Debit = g.Where(x => x.EntryType == 1).Sum(x => x.Amount),
                             Credit = g.Where(x => x.EntryType == 2).Sum(x => x.Amount)
-                        }).ToListAsync();
+                        })
+                        .ToDictionaryAsync(x => x.AccountId);
 
-                    // 7. Isku-geynta (Mapping)
-                    var mappedResult = pagedAccounts.Select(acc => {
-                        var bal = balances.FirstOrDefault(b => b.AccountId == acc.Id);
+                    // 4. Mapping
+                    var mappedResult = pagedAccounts.Select(acc =>
+                    {
+                        balances.TryGetValue(acc.Id, out var bal);
+
+                        var debit = bal?.Debit ?? 0;
+                        var credit = bal?.Credit ?? 0;
+
+                        var balance = acc.Nature switch
+                        {
+                            AccountNatureEnum.Asset => debit - credit,
+                            AccountNatureEnum.Expense => debit - credit,
+
+                            AccountNatureEnum.Liability => credit - debit,
+                            AccountNatureEnum.Equity => credit - debit,
+                            AccountNatureEnum.Revenue => credit - debit,
+
+                            _ => 0
+                        };
+
                         return new AccountBalanceSummaryDto
                         {
                             AccountId = acc.Id,
                             AccountName = acc.Name,
-                            CurrencyCode = acc.Currency.Code,
-                            TotalDebit = bal?.Debit ?? 0,
-                            TotalCredit = bal?.Credit ?? 0,
-                            Balance = (bal?.Debit ?? 0) - (bal?.Credit ?? 0)
+                            CurrencyCode = acc.Currency?.Code ?? "N/A",
+                            TotalDebit = debit,
+                            TotalCredit = credit,
+                            Balance = balance
                         };
                     }).ToList();
 
-                    // 8. Return PagedResponse
-                    return new PagedResponse<AccountBalanceSummaryDto>(mappedResult, page, pageSize, totalRecords);
+                    return new PagedResponse<AccountBalanceSummaryDto>(
+                        mappedResult,
+                        page,
+                        pageSize,
+                        totalRecords
+                    );
                 },
+
                 successMessageFactory: r => $"{r.Data.Count} account balances fetched",
                 cacheMessage: "Balances loaded from cache",
                 errorMessage: "Error calculating balances"
@@ -1084,9 +1129,13 @@ namespace Backend.Services.Accounts
         }
 
 
-
-
-        public async Task<ResponseWrapper<PagedResponse<TransactionDetailDto>>> GetAccountStatementAsync(Guid accountId, int page = 1, int pageSize = 10)
+        public async Task<ResponseWrapper<PagedResponse<TransactionDetailDto>>> GetAccountStatementAsync(
+     Guid accountId,
+     int page = 1,
+     int pageSize = 10,
+     byte? entryType = null,          // 1=Debit, 2=Credit
+     DateTime? fromDate = null,
+     DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
@@ -1096,52 +1145,101 @@ namespace Backend.Services.Accounts
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
+            // ✅ FIX: Normalize dates to UTC BEFORE cacheKey
+            DateTime? startDate = null;
+            DateTime? endDate = null;
+
+            if (fromDate.HasValue)
+            {
+                startDate = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+            }
+
+            if (toDate.HasValue)
+            {
+                endDate = DateTime.SpecifyKind(
+                    toDate.Value.Date.AddDays(1).AddTicks(-1),
+                    DateTimeKind.Utc
+                );
+            }
+
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{AccountCacheKey}_Statement_{accountId}_P{page}_PS{pageSize}",
+                // ✅ FIXED cache key (no raw DateTime)
+                cacheKey: $"{AccountCacheKey}_Statement_{accountId}_P{page}_PS{pageSize}_T{entryType}_F{startDate:yyyyMMdd}_TO{endDate:yyyyMMdd}",
                 action: async () =>
                 {
-                    // 2. Hubi in akoonkan uu ka tirsan yahay Agency-ga saxda ah (Security Check)
+                    // 🔒 Security Check
                     var accountExists = await _context.Accounts
                         .AnyAsync(a => a.Id == accountId && (isAdmin || a.AgencyId == agencyId));
 
                     if (!accountExists)
                         throw new Exception("Account not found or unauthorized access.");
 
-                    // 3. Base Query ee TransactionDetails
+                    // 📊 Base Query
                     var query = _context.TransactionDetails
                         .Include(td => td.Transaction)
                         .Include(td => td.Currency)
+                        .Include(td => td.Account)
                         .Where(td => td.AccountId == accountId)
                         .AsNoTracking();
 
-                    // 4. Count & Paginate
+                    // 🔹 Filter: EntryType
+                    if (entryType.HasValue)
+                    {
+                        query = query.Where(td => td.EntryType == entryType.Value);
+                    }
+
+                    // 🔹 FIXED Date Filters (UTC)
+                    if (startDate.HasValue)
+                    {
+                        query = query.Where(td => td.CreatedAt >= startDate.Value);
+                    }
+
+                    if (endDate.HasValue)
+                    {
+                        query = query.Where(td => td.CreatedAt <= endDate.Value);
+                    }
+
+                    // 📊 Count
                     var totalRecords = await query.CountAsync();
 
-                    var mapped = await query
-                        .OrderByDescending(td => td.CreatedAt) // Had iyo jeer kuwa ugu dambeeya kor keen
+                    // 📥 Load data
+                    var data = await query
+                        .OrderByDescending(td => td.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        .Select(td => new TransactionDetailDto
-                        {
-                            Id = td.Id,
-                            Amount = td.Amount,
-                            EntryType = td.EntryType, // 1 = Debit, 2 = Credit
-                            CurrencyCode = td.Currency.Code,
-                            ReferenceNo = td.Transaction.ReferenceNo,
-                            Description = td.Transaction.Description,
-                            CreatedAt = td.CreatedAt,
-                        })
                         .ToListAsync();
 
-                    return new PagedResponse<TransactionDetailDto>(mapped, page, pageSize, totalRecords);
+                    // 🔁 Mapping
+                    var mapped = data.Select(td => new TransactionDetailDto
+                    {
+                        Id = td.Id,
+                        AccountId = td.AccountId,
+                        AccountName = td.Account?.Name ?? "N/A",
+
+                        Amount = td.Amount,
+                        EntryType = td.EntryType,
+
+                        CurrencyId = td.CurrencyId,
+                        CurrencyCode = td.Currency?.Code ?? "N/A",
+
+                        ReferenceNo = td.Transaction?.ReferenceNo,
+                        Description = td.Transaction?.Description,
+
+                        CreatedAt = td.CreatedAt // already UTC
+                    }).ToList();
+
+                    return new PagedResponse<TransactionDetailDto>(
+                        mapped,
+                        page,
+                        pageSize,
+                        totalRecords
+                    );
                 },
-                successMessageFactory: r => $"Statement for account fetched successfully",
+                successMessageFactory: r => "Statement for account fetched successfully",
                 cacheMessage: "Account statement loaded from cache",
                 errorMessage: "Error fetching account statement"
             );
         }
-
-
 
 
         public async Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(int page = 1, int pageSize = 10)
@@ -1505,6 +1603,299 @@ namespace Backend.Services.Accounts
                 successMessageFactory: result => $"{result.Data.Count} Revenue fetched",
                 cacheMessage: "Revenue loaded from cache",
                 errorMessage: "Error fetching revenue"
+            );
+        }
+
+
+
+        public async Task<ResponseWrapper<ProfitLossDto>> GetProfitLossAsync(
+     DateTime? fromDate = null,
+     DateTime? toDate = null)
+        {
+            // 1. Guard Clause
+            if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
+                throw new ArgumentException("FromDate cannot be greater than ToDate");
+
+            // 2. Role Check
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_PL_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}",
+                action: async () =>
+                {
+                    var query = _context.TransactionDetails
+                        .AsNoTracking();
+
+                    // 3. Multi-tenant filter
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.Account.AgencyId == agencyId);
+                    }
+
+                    // 4. Date filtering (UTC safe)
+                    if (fromDate.HasValue)
+                    {
+                        var start = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+                        query = query.Where(x => x.CreatedAt >= start);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var end = DateTime.SpecifyKind(
+                            toDate.Value.Date.AddDays(1).AddTicks(-1),
+                            DateTimeKind.Utc
+                        );
+                        query = query.Where(x => x.CreatedAt <= end);
+                    }
+
+                    // 5. Single optimized aggregation query
+                    var result = await query
+                        .GroupBy(x => 1)
+                        .Select(g => new ProfitLossDto
+                        {
+                            Revenue = g.Where(x => x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2)
+                                       .Sum(x => (decimal?)x.Amount) ?? 0,
+
+                            Expense = g.Where(x => x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
+                                       .Sum(x => (decimal?)x.Amount) ?? 0
+                        })
+                        .FirstOrDefaultAsync() ?? new ProfitLossDto();
+
+                    // 6. Final calculation
+                    result.Profit = result.Revenue - result.Expense;
+
+                    return result;
+                },
+                successMessageFactory: result => $"Profit calculated: {result.Profit}",
+                cacheMessage: "Profit & Loss loaded from cache",
+                errorMessage: "Error calculating profit & loss"
+            );
+        }
+        public async Task<ResponseWrapper<PagedResponse<DailyReportDto>>> GetDailyReportAsync(
+     DateTime fromDate,
+     DateTime toDate,
+     int page = 1,
+     int pageSize = 10)
+        {
+            // 1. Guard Clauses
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 10;
+            pageSize = Math.Min(pageSize, 100);
+
+            if (fromDate > toDate)
+                throw new ArgumentException("FromDate cannot be greater than ToDate");
+
+            // 2. Role Check
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_DR_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}_P{page}_PS{pageSize}",
+                action: async () =>
+                {
+                    // 3. Convert to UTC
+                    var startDate = DateTime.SpecifyKind(fromDate.Date, DateTimeKind.Utc);
+
+                    var endDate = DateTime.SpecifyKind(
+                        toDate.Date.AddDays(1).AddTicks(-1),
+                        DateTimeKind.Utc
+                    );
+
+                    var query = _context.TransactionDetails
+                        .AsNoTracking()
+                        .Where(x => x.CreatedAt >= startDate && x.CreatedAt <= endDate);
+
+                    // 4. Multi-tenant filter
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.Account.AgencyId == agencyId);
+                    }
+
+                    // 5. Grouping (Daily Aggregation)
+                    var groupedQuery = query
+                        .GroupBy(x => x.CreatedAt.Date)
+                        .Select(g => new DailyReportDto
+                        {
+                            Date = g.Key,
+                            TotalIn = g.Where(x => x.EntryType == 1)
+                                       .Sum(x => (decimal?)x.Amount) ?? 0,
+                            TotalOut = g.Where(x => x.EntryType == 2)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                        })
+                        .Select(x => new DailyReportDto
+                        {
+                            Date = x.Date,
+                            TotalIn = x.TotalIn,
+                            TotalOut = x.TotalOut,
+                            Balance = x.TotalIn - x.TotalOut
+                        });
+
+                    // 6. Total Count (after grouping)
+                    var totalRecords = await groupedQuery.CountAsync();
+
+                    // 7. Pagination
+                    var data = await groupedQuery
+                        .OrderBy(x => x.Date)
+                        .Skip((page - 1) * pageSize)
+                        .Take(pageSize)
+                        .ToListAsync();
+
+                    return new PagedResponse<DailyReportDto>(data, page, pageSize, totalRecords);
+                },
+                successMessageFactory: result => $"{result.Data.Count} daily reports fetched",
+                cacheMessage: "Daily report loaded from cache",
+                errorMessage: "Error generating daily report"
+            );
+        }
+
+
+
+
+        public async Task<ResponseWrapper<ProfitLossDetailedDto>> GetProfitLossDetailedAsync(
+           DateTime? fromDate = null,
+           DateTime? toDate = null,
+           int page = 1,
+           int pageSize = 10)
+        {
+            // 1. Guard Clauses
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 10;
+            pageSize = Math.Min(pageSize, 100);
+
+            if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
+                throw new ArgumentException("FromDate cannot be greater than ToDate");
+
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_PL_DETAIL_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}_P{page}_PS{pageSize}",
+                action: async () =>
+                {
+                    var query = _context.TransactionDetails
+                        .Include(x => x.Account)
+                        .AsNoTracking();
+
+                    // 🔒 Multi-tenant filter
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.Account.AgencyId == agencyId);
+                    }
+
+                    // 📅 Date filter
+                    if (fromDate.HasValue)
+                    {
+                        var start = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+                        query = query.Where(x => x.CreatedAt >= start);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var end = DateTime.SpecifyKind(
+                            toDate.Value.Date.AddDays(1).AddTicks(-1),
+                            DateTimeKind.Utc
+                        );
+                        query = query.Where(x => x.CreatedAt <= end);
+                    }
+
+                    // ===============================
+                    // 🔥 GROUPED DETAILS (Account + Date)
+                    // ===============================
+                    var combinedQuery = query
+                        .Where(x =>
+                            (x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2) ||
+                            (x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
+                        )
+                        .GroupBy(x => new
+                        {
+                            x.Account.Name,
+                            x.Account.Nature,
+                            Date = x.CreatedAt.Date
+                        })
+                        .Select(g => new ProfitLossItemDto
+                        {
+                            AccountName = g.Key.Name,
+                            Type = g.Key.Nature == AccountNatureEnum.Revenue ? "Revenue" : "Expense",
+                            Amount = g.Sum(x => x.Amount),
+                            Date = g.Key.Date
+                        });
+
+                    // 📊 total records
+                    var totalRecords = await combinedQuery.CountAsync();
+
+                    // 📥 paginated data
+                    var data = await combinedQuery
+                        .OrderByDescending(x => x.Date)
+                        .ThenByDescending(x => x.Amount)
+                        .Skip((page - 1) * pageSize)
+                        .Take(pageSize)
+                        .ToListAsync();
+
+                    // ===============================
+                    // 🔥 TOTALS (FULL DATA)
+                    // ===============================
+                    var totalRevenue = await query
+                        .Where(x => x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2)
+                        .SumAsync(x => (decimal?)x.Amount) ?? 0;
+
+                    var totalExpense = await query
+                        .Where(x => x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
+                        .SumAsync(x => (decimal?)x.Amount) ?? 0;
+
+                    return new ProfitLossDetailedDto
+                    {
+                        TotalRevenue = totalRevenue,
+                        TotalExpense = totalExpense,
+                        Profit = totalRevenue - totalExpense,
+
+                        Details = new PagedResponse<ProfitLossItemDto>(
+                            data,
+                            page,
+                            pageSize,
+                            totalRecords
+                        )
+                    };
+                },
+                successMessageFactory: r => $"Profit: {r.Profit}",
+                cacheMessage: "Detailed P&L loaded from cache",
+                errorMessage: "Error generating detailed profit & loss"
+            );
+        }
+
+
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountsLookupAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{AccountCacheKey}_Lookup_{_currentUser.UserId}",
+                action: async () =>
+                {
+                    var query = _context.Accounts
+                        .AsNoTracking();
+
+                    // 🔒 Multi-tenant filter
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    var data = await query
+                        .OrderBy(x => x.Name)
+                        .Select(x => new AccountLookupDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} accounts fetched",
+                cacheMessage: "Accounts lookup loaded from cache",
+                errorMessage: "Error fetching accounts lookup"
             );
         }
 

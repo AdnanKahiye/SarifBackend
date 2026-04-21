@@ -1,5 +1,6 @@
 ﻿using Backend.DTOs.Requests.Accounts;
 using Backend.Interfaces.Accounts;
+using Backend.Models.Accounts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -114,19 +115,35 @@ namespace Backend.Controllers.Accounts
         }
 
         [HttpGet("balances-summary")]
-        public async Task<IActionResult> GetBalancesSummary([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetBalancesSummary(
+          [FromQuery] int page = 1,
+          [FromQuery] int pageSize = 10,
+
+          [FromQuery] DateTime? fromDate = null,
+          [FromQuery] DateTime? toDate = null,
+
+          [FromQuery] AccountTypeEnum? accountType = null // ✅ THIS
+      )
         {
-            // Kani wuxuu keenayaa liiska dhammaan accounts-ka iyo balance-kooda (Dashboard)
-            var result = await _accountService.GetAccountBalancesSummaryAsync(page, pageSize);
+            var result = await _accountService.GetAccountBalancesSummaryAsync(
+                page, pageSize, fromDate, toDate, accountType);
+
             return Ok(result);
         }
 
 
         [HttpGet("account-statement/{id}")]
-        public async Task<IActionResult> GetAccountStatement(Guid id, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetAccountStatement(
+       Guid id,
+       [FromQuery] int page = 1,
+       [FromQuery] int pageSize = 10,
+       [FromQuery] byte? entryType = null,
+       [FromQuery] DateTime? fromDate = null,
+       [FromQuery] DateTime? toDate = null)
         {
-            // Kani wuxuu keenayaa xogta (Ledger) hal account oo gaar ah
-            var result = await _accountService.GetAccountStatementAsync(id, page, pageSize);
+            var result = await _accountService.GetAccountStatementAsync(
+                id, page, pageSize, entryType, fromDate, toDate);
+
             return Ok(result);
         }
 
@@ -222,6 +239,48 @@ namespace Backend.Controllers.Accounts
         public async Task<IActionResult> GetAllRevinues([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             var result = await _accountService.GetAllRevinuesAsync(page, pageSize);
+            return Ok(result);
+        }
+
+
+
+        [HttpGet("profit-loss")]
+        public async Task<IActionResult> GetProfitLoss(
+    [FromQuery] DateTime? fromDate,
+    [FromQuery] DateTime? toDate)
+        {
+            var result = await _accountService.GetProfitLossAsync(fromDate, toDate);
+            return Ok(result);
+        }
+
+        [HttpGet("daily-report")]
+        public async Task<IActionResult> GetDailyReport(
+            [FromQuery] DateTime fromDate,
+            [FromQuery] DateTime toDate)
+        {
+            var result = await _accountService.GetDailyReportAsync(fromDate, toDate);
+            return Ok(result);
+        }
+
+
+        [HttpGet("profit-loss-detailed")]
+        public async Task<IActionResult> GetProfitLossDetailed(
+    [FromQuery] DateTime? fromDate,
+    [FromQuery] DateTime? toDate,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
+        {
+            var result = await _accountService.GetProfitLossDetailedAsync(
+                fromDate, toDate, page, pageSize);
+
+            return Ok(result);
+        }
+
+
+        [HttpGet("accounts-lookup")]
+        public async Task<IActionResult> GetAccountsLookup()
+        {
+            var result = await _accountService.GetAccountsLookupAsync();
             return Ok(result);
         }
     }

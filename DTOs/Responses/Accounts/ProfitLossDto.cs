@@ -6,9 +6,9 @@ namespace Backend.DTOs.Responses.Accounts
 {
     public class ProfitLossDto
     {
-        public decimal TotalRevenue { get; set; }
-        public decimal TotalExpense { get; set; }
-        public decimal NetProfit { get; set; }
+        public decimal Revenue { get; set; }
+        public decimal Expense { get; set; }
+        public decimal Profit { get; set; }
     }
 }
 

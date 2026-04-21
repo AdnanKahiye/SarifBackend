@@ -2,6 +2,7 @@
 using Backend.DTOs.Requests.Customers;
 using Backend.DTOs.Responses.Accounts;
 using Backend.DTOs.Responses.Customers;
+using Backend.Models.Accounts;
 using Backend.Wrapper;
 
 namespace Backend.Interfaces.Accounts
@@ -71,9 +72,43 @@ namespace Backend.Interfaces.Accounts
 
         Task<ResponseWrapper<PagedResponse<TransactionDto>>> GetAllTransactionsAsync(int page = 1, int pageSize = 10);
         Task<ResponseWrapper<bool>> UpdateTransactionAsync(Guid id, UpdateTransactionDto dto);
-        Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>> GetAccountBalancesSummaryAsync(int page = 1, int pageSize = 10);
-        Task<ResponseWrapper<PagedResponse<TransactionDetailDto>>> GetAccountStatementAsync(Guid accountId, int page = 1, int pageSize = 10);
+        Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>>
+        GetAccountBalancesSummaryAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null,
+            AccountTypeEnum? accountType = null
+        );
+        Task<ResponseWrapper<PagedResponse<TransactionDetailDto>>>
+        GetAccountStatementAsync(
+            Guid accountId,
+            int page = 1,
+            int pageSize = 10,
+            byte? entryType = null,        // 1=Debit, 2=Credit
+            DateTime? fromDate = null,
+            DateTime? toDate = null
+        );
 
+        Task<ResponseWrapper<PagedResponse<DailyReportDto>>> GetDailyReportAsync(
+             DateTime fromDate,
+             DateTime toDate,
+             int page = 1,
+             int pageSize = 10);
+
+        Task<ResponseWrapper<ProfitLossDto>> GetProfitLossAsync(
+         DateTime? fromDate = null,
+         DateTime? toDate = null);
+
+       Task<ResponseWrapper<ProfitLossDetailedDto>> GetProfitLossDetailedAsync(
+DateTime? fromDate = null,
+DateTime? toDate = null,
+int page = 1,
+int pageSize = 10);
+
+
+
+        Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountsLookupAsync();
         Task<ResponseWrapper<bool>> DeleteTransactionAsync(Guid id);
 
         Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(int page = 1, int pageSize = 10);
