@@ -261,14 +261,16 @@ namespace Backend.Mapping
                .ForMember(dest => dest.FromAccountName,
                    opt => opt.MapFrom(src => src.FromAccount != null ? src.FromAccount.Name : string.Empty))
                .ForMember(dest => dest.ToAccountName,
-                   opt => opt.MapFrom(src => src.ToAccount != null ? src.ToAccount.Name : string.Empty));
+                   opt => opt.MapFrom(src => src.ToAccount != null ? src.ToAccount.Name : string.Empty))
+            .ForMember(dest => dest.Reference,
+                   opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.ReferenceNo : string.Empty));
 
 
 
 
             CreateMap<Transfer, TransferDto>()
            .ForMember(dest => dest.UserName,
-               opt => opt.MapFrom(src => src.User != null ? src.User.UserName : string.Empty))
+               opt => opt.MapFrom(src => src.User != null ? src.User.FirstName : string.Empty))
            .ForMember(dest => dest.FromAccountName,
                opt => opt.MapFrom(src => src.FromAccount != null ? src.FromAccount.Name : string.Empty))
            .ForMember(dest => dest.ToAccountName,

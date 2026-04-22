@@ -1,4 +1,6 @@
-﻿namespace Backend.DTOs.Responses.Accounts
+﻿using Backend.Models.Accounts;
+
+namespace Backend.DTOs.Responses.Accounts
 {
     public class AccountDto
     {
@@ -6,8 +8,7 @@
 
         public string Name { get; set; } = string.Empty;
 
-        public int AccountType { get; set; }   // or use enum
-
+        public AccountTypeEnum AccountType { get; set; }
         public Guid? ReferenceId { get; set; }
 
         public int CurrencyId { get; set; }

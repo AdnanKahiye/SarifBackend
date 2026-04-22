@@ -475,9 +475,13 @@ namespace Backend.Services.Accounts
             Dictionary<int, decimal> rates = new();
             if (isMultiCurrency)
             {
-                rates = await _context.ExchangeRates
-                    .Where(r => distinctCurrencies.Contains(r.CurrencyId))
-                    .ToDictionaryAsync(r => r.CurrencyId, r => r.Rate);
+                            rates = await _context.ExchangeRates
+                .Where(r => distinctCurrencies.Contains(r.CurrencyId))
+                .GroupBy(r => r.CurrencyId)
+                .ToDictionaryAsync(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.CreatedAt).First().Rate
+    );
             }
 
             // 4. DOUBLE-ENTRY VALIDATION
@@ -576,20 +580,71 @@ namespace Backend.Services.Accounts
                         decimal totalRevenue = (dto.Profit ?? 0) + (dto.Fee ?? 0);
 
                         if (totalRevenue > 0)
+
                         {
+
+                            var toDetail = dto.Details.FirstOrDefault(d => d.EntryType == 1);
+
+                            if (toDetail == null)
+                                throw new Exception("Destination account lama helin");
+
+                            var currencyId = toDetail.CurrencyId;
+
+                            // 🔥 Hel Revenue Account
+                            var revenueAccount = await _context.Accounts
+                                .FirstOrDefaultAsync(a =>
+                                    a.AccountType == AccountTypeEnum.Revenue &&
+                                    a.CurrencyId == currencyId &&
+                                    a.Name.Contains("Exchange Profit"));
+
+                            // ❗ HUBI HALKAN KA HOR ISTICMAAL
+                            if (revenueAccount == null)
+                                throw new Exception($"Exchange Profit account lama helin currencyId: {currencyId}");
+
+
+                            // 👉 Debit (Cash)
+                            // 👉 Debit (Cash)
+                            _context.TransactionDetails.Add(new TransactionDetail
+                            {
+                                Id = Guid.NewGuid(),
+                                TransactionId = transaction.Id,
+                                AccountId = toDetail.AccountId,
+                                CurrencyId = toDetail.CurrencyId, // ✅ ADD THIS
+                                Amount = totalRevenue,
+                                EntryType = 1,
+                                UserId = _currentUser.UserId,
+                                TransactionType = transaction.TransactionType,
+                                CreatedAt = DateTime.UtcNow
+                            });
+
+                            // 👉 Credit (Revenue)
+                            _context.TransactionDetails.Add(new TransactionDetail
+                            {
+                                Id = Guid.NewGuid(),
+                                TransactionId = transaction.Id,
+                                AccountId = revenueAccount.Id,
+                                CurrencyId = currencyId, // ✅ ADD THIS
+                                Amount = totalRevenue,
+                                EntryType = 2,
+                                UserId = _currentUser.UserId,
+                                TransactionType = transaction.TransactionType,
+                                CreatedAt = DateTime.UtcNow
+                            });
+
+                            // 👉 Save Revenue table
                             var autoRevenue = new Revenue
                             {
                                 Id = Guid.NewGuid(),
                                 TransactionId = transaction.Id,
                                 Title = $"Exchange Profit/Fee - Ref: {transaction.ReferenceNo}",
                                 Amount = totalRevenue,
-                                // HALKAN MUHIIM: Waa in aad leedahay hal Account oo ah "Exchange Revenue Account"
-                                RevenueAccountId = Guid.Parse("GUID-KA-ACCOUNT-KA-DAKHLIGA-SARIFKA"),
-                                CashAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.AccountId ?? Guid.Empty,
+                                RevenueAccountId = revenueAccount.Id,
+                                CashAccountId = toDetail.AccountId,
                                 SourceType = RevenueSourceEnum.Exchange,
                                 AgencyId = _currentUser.AgencyId,
                                 CreatedAt = DateTime.UtcNow
                             };
+
                             _context.Revenues.Add(autoRevenue);
                         }
 
@@ -1242,49 +1297,85 @@ namespace Backend.Services.Accounts
         }
 
 
-        public async Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(int page = 1, int pageSize = 10)
+        public async Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
+            // ✅ FIX: Normalize dates to UTC
+            DateTime? startDate = null;
+            DateTime? endDate = null;
+
+            if (fromDate.HasValue)
+            {
+                startDate = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+            }
+
+            if (toDate.HasValue)
+            {
+                endDate = DateTime.SpecifyKind(
+                    toDate.Value.Date.AddDays(1).AddTicks(-1),
+                    DateTimeKind.Utc
+                );
+            }
+
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ FIX: include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_EX_P{page}_PS{pageSize}_F{startDate:yyyyMMdd}_TO{endDate:yyyyMMdd}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Exchanges
                         .AsNoTracking();
 
-                    // 3. Multi-tenant filter logic
+                    // 🔒 Multi-tenant
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
                     }
 
+                    // 🔹 Date filters (UTC safe)
+                    if (startDate.HasValue)
+                    {
+                        query = query.Where(x => x.CreatedAt >= startDate.Value);
+                    }
+
+                    if (endDate.HasValue)
+                    {
+                        query = query.Where(x => x.CreatedAt <= endDate.Value);
+                    }
+
+                    // 📊 Count
                     var totalRecords = await query.CountAsync();
 
+                    // 📥 Data
                     var mapped = await query
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<ExchangeDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
-                    return new PagedResponse<ExchangeDto>(mapped, page, pageSize, totalRecords);
+                    return new PagedResponse<ExchangeDto>(
+                        mapped,
+                        page,
+                        pageSize,
+                        totalRecords
+                    );
                 },
-                successMessageFactory: result => $"{result.Data.Count} Exchange fetched",
-                cacheMessage: "Exchange loaded from cache",
-                errorMessage: "Error fetching exchange"
+                successMessageFactory: result => $"{result.Data.Count} exchanges fetched",
+                cacheMessage: "Exchanges loaded from cache",
+                errorMessage: "Error fetching exchanges"
             );
         }
-
 
 
 
@@ -1753,12 +1844,11 @@ namespace Backend.Services.Accounts
 
 
         public async Task<ResponseWrapper<ProfitLossDetailedDto>> GetProfitLossDetailedAsync(
-           DateTime? fromDate = null,
-           DateTime? toDate = null,
-           int page = 1,
-           int pageSize = 10)
+       DateTime? fromDate = null,
+       DateTime? toDate = null,
+       int page = 1,
+       int pageSize = 10)
         {
-            // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
@@ -1777,13 +1867,9 @@ namespace Backend.Services.Accounts
                         .Include(x => x.Account)
                         .AsNoTracking();
 
-                    // 🔒 Multi-tenant filter
                     if (!isAdmin)
-                    {
                         query = query.Where(x => x.Account.AgencyId == agencyId);
-                    }
 
-                    // 📅 Date filter
                     if (fromDate.HasValue)
                     {
                         var start = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
@@ -1799,20 +1885,66 @@ namespace Backend.Services.Accounts
                         query = query.Where(x => x.CreatedAt <= end);
                     }
 
+                    // 🔥 GET USED CURRENCIES ONLY
+                    var currencies = await query
+                        .Select(x => x.CurrencyId)
+                        .Distinct()
+                        .ToListAsync();
+
+                    // 🔥 GET LATEST RATES (ONE QUERY)
+                    var rates = await _context.ExchangeRates
+                        .Where(r => currencies.Contains(r.CurrencyId))
+                        .GroupBy(r => r.CurrencyId)
+                        .ToDictionaryAsync(
+                            g => g.Key,
+                            g => g.OrderByDescending(x => x.CreatedAt).First().Rate
+                        );
+
+                    int baseCurrencyId = 1; // 👉 USD
+
                     // ===============================
-                    // 🔥 GROUPED DETAILS (Account + Date)
+                    // 🔥 FILTER ONLY REVENUE + EXPENSE
                     // ===============================
-                    var combinedQuery = query
-                        .Where(x =>
-                            (x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2) ||
-                            (x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
-                        )
-                        .GroupBy(x => new
+                    var filtered = query.Where(x =>
+                        (x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2) ||
+                        (x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
+                    );
+
+                    // 📥 Load ONLY needed rows
+                    var rawData = await filtered
+                        .Select(x => new
                         {
                             x.Account.Name,
                             x.Account.Nature,
+                            x.Amount,
+                            x.CurrencyId,
                             Date = x.CreatedAt.Date
                         })
+                        .ToListAsync();
+
+                    // ===============================
+                    // 🔥 CONVERT TO BASE CURRENCY
+                    // ===============================
+                    var converted = rawData.Select(x =>
+                    {
+                        var amount = x.CurrencyId == baseCurrencyId
+                            ? x.Amount
+                            : x.Amount / rates[x.CurrencyId];
+
+                        return new
+                        {
+                            x.Name,
+                            x.Nature,
+                            Amount = amount,
+                            x.Date
+                        };
+                    });
+
+                    // ===============================
+                    // 🔥 GROUP (AFTER CONVERSION)
+                    // ===============================
+                    var grouped = converted
+                        .GroupBy(x => new { x.Name, x.Nature, x.Date })
                         .Select(g => new ProfitLossItemDto
                         {
                             AccountName = g.Key.Name,
@@ -1821,27 +1953,25 @@ namespace Backend.Services.Accounts
                             Date = g.Key.Date
                         });
 
-                    // 📊 total records
-                    var totalRecords = await combinedQuery.CountAsync();
+                    var totalRecords = grouped.Count();
 
-                    // 📥 paginated data
-                    var data = await combinedQuery
+                    var data = grouped
                         .OrderByDescending(x => x.Date)
                         .ThenByDescending(x => x.Amount)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        .ToListAsync();
+                        .ToList();
 
                     // ===============================
-                    // 🔥 TOTALS (FULL DATA)
+                    // 🔥 TOTALS (AFTER CONVERSION)
                     // ===============================
-                    var totalRevenue = await query
-                        .Where(x => x.Account.Nature == AccountNatureEnum.Revenue && x.EntryType == 2)
-                        .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                    var totalRevenue = converted
+                        .Where(x => x.Nature == AccountNatureEnum.Revenue)
+                        .Sum(x => x.Amount);
 
-                    var totalExpense = await query
-                        .Where(x => x.Account.Nature == AccountNatureEnum.Expense && x.EntryType == 1)
-                        .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                    var totalExpense = converted
+                        .Where(x => x.Nature == AccountNatureEnum.Expense)
+                        .Sum(x => x.Amount);
 
                     return new ProfitLossDetailedDto
                     {
@@ -1898,6 +2028,78 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching accounts lookup"
             );
         }
+
+
+
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountEchangeLookupAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{AccountCacheKey}_Lookup_Exchange_{_currentUser.UserId}",
+                action: async () =>
+                {
+                    var query = _context.Accounts.AsNoTracking();
+
+                    // 🔒 Multi-tenant
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // 🔥 FILTER: ONLY exchange accounts
+                    query = query.Where(x =>
+                        x.AccountType == AccountTypeEnum.Cash ||
+                        x.AccountType == AccountTypeEnum.Bank ||
+                        x.AccountType == AccountTypeEnum.Wallet
+                    );
+
+                    var data = await query
+                        .OrderBy(x => x.Name)
+                        .Select(x => new AccountLookupDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} exchange accounts fetched",
+                cacheMessage: "Exchange accounts loaded from cache",
+                errorMessage: "Error fetching exchange accounts"
+            );
+        }
+
+
+        public async Task<ResponseWrapper<List<CurrencyLookupDto>>> GetCurrencyLookupAsync()
+        {
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{AccountCacheKey}_Lookup_{_currentUser.UserId}",
+                action: async () =>
+                {
+                    var query = _context.Currencies
+                        .AsNoTracking();
+
+                    var data = await query
+                        .OrderBy(x => x.Name)
+                        .Select(x => new CurrencyLookupDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} accounts fetched",
+                cacheMessage: "Accounts lookup loaded from cache",
+                errorMessage: "Error fetching accounts lookup"
+            );
+        }
+
 
 
 

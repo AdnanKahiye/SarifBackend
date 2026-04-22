@@ -183,9 +183,19 @@ namespace Backend.Controllers.Accounts
 
 
         [HttpGet("exchanges")]
-        public async Task<IActionResult> GetExchanges([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetExchanges(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllExchangesAsync(page, pageSize);
+            var result = await _accountService.GetAllExchangesAsync(
+                page,
+                pageSize,
+                fromDate,
+                toDate
+            );
+
             return Ok(result);
         }
 
@@ -281,6 +291,21 @@ namespace Backend.Controllers.Accounts
         public async Task<IActionResult> GetAccountsLookup()
         {
             var result = await _accountService.GetAccountsLookupAsync();
+            return Ok(result);
+        }
+
+
+        [HttpGet("currency-lookup")]
+        public async Task<IActionResult> GetCurrencyLookup()
+        {
+            var result = await _accountService.GetCurrencyLookupAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("account-exchange-lookup")]
+        public async Task<IActionResult> GetAccountExchangeLookup()
+        {
+            var result = await _accountService.GetAccountEchangeLookupAsync();
             return Ok(result);
         }
     }

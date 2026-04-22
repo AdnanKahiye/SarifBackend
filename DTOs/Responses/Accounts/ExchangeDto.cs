@@ -13,14 +13,17 @@
         public decimal Profit { get; set; }
 
         public Guid TransactionId { get; set; }
+        public string Reference { get; set; }
 
         public Guid FromAccountId { get; set; }
         public string? FromAccountName { get; set; }
 
         public Guid ToAccountId { get; set; }
         public string? ToAccountName { get; set; }
+        public DateTime CreatedAt { get; set; }
 
         public string? UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
+
     }
 }

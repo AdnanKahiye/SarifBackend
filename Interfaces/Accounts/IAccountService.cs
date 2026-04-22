@@ -109,10 +109,16 @@ int pageSize = 10);
 
 
         Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountsLookupAsync();
+        Task<ResponseWrapper<List<CurrencyLookupDto>>> GetCurrencyLookupAsync();
         Task<ResponseWrapper<bool>> DeleteTransactionAsync(Guid id);
+        Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountEchangeLookupAsync();
 
-        Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(int page = 1, int pageSize = 10);
-        Task<ResponseWrapper<PagedResponse<TransferDto>>> GetAllTransfersAsync(int page = 1, int pageSize = 10);
+        Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null
+        ); Task<ResponseWrapper<PagedResponse<TransferDto>>> GetAllTransfersAsync(int page = 1, int pageSize = 10);
         Task<ResponseWrapper<PagedResponse<LoanDto>>> GetAllLoanAsync(int page = 1, int pageSize = 10);
         Task<ResponseWrapper<PagedResponse<ExpenseDto>>> GetAllExpensesAsync(int page = 1, int pageSize = 10);
         Task<ResponseWrapper<PagedResponse<DepositDto>>> GetAllDepositsAsync(int page = 1, int pageSize = 10);
