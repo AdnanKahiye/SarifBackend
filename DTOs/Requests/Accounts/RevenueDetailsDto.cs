@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Backend.Models.Accounts;
+using System.ComponentModel.DataAnnotations;
 
 namespace Backend.DTOs.Requests.Accounts
 {
@@ -8,6 +9,8 @@ namespace Backend.DTOs.Requests.Accounts
         public string Title { get; set; } = string.Empty; // Tusaale: "Khidmadda Adeegga"
 
         public string? Description { get; set; }
+
+       public RevenueSourceEnum SourceType { get; set; } // Halkan u beddel Enum
 
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Lacagtu waa inay ka badnaataa 0")]
@@ -19,6 +22,5 @@ namespace Backend.DTOs.Requests.Accounts
         [Required]
         public Guid CashAccountId { get; set; } // Khasnadda lacagtu ku dhacday (Type: Cash/Bank)
 
-        public int? CurrencyId { get; set; }
     }
 }

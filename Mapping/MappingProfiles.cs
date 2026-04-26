@@ -208,8 +208,15 @@ namespace Backend.Mapping
 
 
             // 1. Transaction Mapping (Hubi in Details ay raacaan)
-            CreateMap<CreateTransactionDto, Transaction>()
-                .ForMember(dest => dest.Details, opt => opt.MapFrom(src => src.Details));
+                CreateMap<CreateTransactionRequest, Transaction>()
+                    .ForMember(dest => dest.Id, opt => opt.Ignore())
+                    .ForMember(dest => dest.ReferenceNo, opt => opt.Ignore())
+                    .ForMember(dest => dest.Details, opt => opt.Ignore())
+                    .ForMember(dest => dest.TotalAmount, opt => opt.Ignore())
+                    .ForMember(dest => dest.UserId, opt => opt.Ignore())
+                    .ForMember(dest => dest.AgencyId, opt => opt.Ignore())
+                    .ForMember(dest => dest.BranchId, opt => opt.Ignore())
+                    .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
 
             CreateMap<UpdateTransactionDto, Transaction>();
 
@@ -260,8 +267,13 @@ namespace Backend.Mapping
                    opt => opt.MapFrom(src => src.User != null ? src.User.UserName : string.Empty))
                .ForMember(dest => dest.FromAccountName,
                    opt => opt.MapFrom(src => src.FromAccount != null ? src.FromAccount.Name : string.Empty))
+               .ForMember(dest => dest.FromCurrencyId,
+                   opt => opt.MapFrom(src => src.FromAccount != null ? src.FromAccount.CurrencyId :0))
                .ForMember(dest => dest.ToAccountName,
                    opt => opt.MapFrom(src => src.ToAccount != null ? src.ToAccount.Name : string.Empty))
+            .ForMember(dest => dest.ToCurrencyId,
+                   opt => opt.MapFrom(src => src.ToAccount != null ? src.ToAccount.CurrencyId :0))
+
             .ForMember(dest => dest.Reference,
                    opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.ReferenceNo : string.Empty));
 

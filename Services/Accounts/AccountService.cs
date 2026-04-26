@@ -434,6 +434,873 @@ namespace Backend.Services.Accounts
         }
 
 
+        private async Task<(int FromCurrencyId, int ToCurrencyId)> GetAccountCurrenciesAsync(
+    Guid fromAccountId,
+    Guid toAccountId)
+        {
+            var accounts = await _context.Accounts
+                .Where(a => a.Id == fromAccountId || a.Id == toAccountId)
+                .Select(a => new { a.Id, a.CurrencyId })
+                .ToListAsync();
+
+            var fromCurrency = accounts
+                .FirstOrDefault(a => a.Id == fromAccountId)?.CurrencyId;
+
+            var toCurrency = accounts
+                .FirstOrDefault(a => a.Id == toAccountId)?.CurrencyId;
+
+            if (fromCurrency == null || toCurrency == null)
+                throw new Exception("Invalid account(s)");
+
+            return (fromCurrency.Value, toCurrency.Value);
+        }
+
+
+
+
+        public async Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(_currentUser.UserId))
+                return await ResponseWrapper<Guid>.FailureAsync("Unauthorized","User not authenticated",
+                    401);
+
+            if (request == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Validation Error","Request cannot be null");
+
+            //  APPLY FOR EXCHANGE
+            if (request.TransactionType == TransactionTypeEnum.Exchange)
+            {
+                if (request.Exchange == null)
+                    return await ResponseWrapper<Guid>.FailureAsync("Exchange data required");
+
+                var (fromCurrencyId, toCurrencyId) =
+                    await GetAccountCurrenciesAsync(
+                        request.Exchange.FromAccountId,
+                        request.Exchange.ToAccountId);
+
+                request.Exchange.FromCurrencyId = fromCurrencyId;
+                request.Exchange.ToCurrencyId = toCurrencyId;
+            }
+
+            // ✅ NOW SWITCH
+            return request.TransactionType switch
+            {
+                TransactionTypeEnum.Exchange => await CreateExchangeAsync(request),
+
+                // KEEP YOUR OTHER TYPES
+                TransactionTypeEnum.Transfer => await CreateTransferAsync(request),
+                TransactionTypeEnum.Loan => await CreateLoanAsync(request),
+                TransactionTypeEnum.Expense => await CreateExpenseAsync(request),
+                TransactionTypeEnum.Deposit => await CreateDepositAsync(request),
+                TransactionTypeEnum.Withdraw => await CreateWithdrawAsync(request),
+                TransactionTypeEnum.Repayment => await CreateRepaymentAsync(request),
+                TransactionTypeEnum.Revenue => await CreateRevenueAsync(request),
+
+                _ => await ResponseWrapper<Guid>.FailureAsync(
+                    "Validation Error",
+                    "Invalid type")
+            };
+        }
+
+        private async Task<ResponseWrapper<Guid>> CreateExchangeAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Exchange;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Exchange required");
+
+            var rates = await GetRates(dto.FromCurrencyId, dto.ToCurrencyId);
+
+            var fromRate = rates[dto.FromCurrencyId];
+            var toRate = rates[dto.ToCurrencyId];
+
+            // ✅ Base conversion (USD base)
+            var baseAmount = dto.FromAmount / fromRate;
+
+            // ✅ Gross amount (before fee)
+            var grossToAmount = baseAmount * toRate;
+
+            // 🔥 Get settings
+            var settings = await GetExchangeSettings(dto.ToCurrencyId);
+
+            // 🔥 Calculate fee & profit (BASE currency)
+            var fee = baseAmount * settings.FeeRate;
+            var profit = baseAmount * settings.ProfitRate;
+
+            var totalRevenue = fee + profit;
+
+            // 🔥 Convert revenue to target currency
+            var revenueInToCurrency = totalRevenue * toRate;
+
+            // ✅ Final amount (what customer gets)
+            var finalAmount = grossToAmount - revenueInToCurrency;
+
+            if (finalAmount <= 0)
+                return await ResponseWrapper<Guid>.FailureAsync("Invalid exchange calculation");
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+                var transaction = CreateBaseTransaction(request, baseAmount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🔴 CREDIT (From Account)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.FromAccountId,
+                CurrencyId = dto.FromCurrencyId,
+                Amount = dto.FromAmount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🟢 DEBIT (To Account - NET ONLY)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.ToAccountId,
+                CurrencyId = dto.ToCurrencyId,
+                Amount = finalAmount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                // 🔥 ADD PROFIT ONLY (NO CASH DUPLICATION)
+                if (totalRevenue > 0)
+                {
+                    var revenueAccount = await GetRevenueAccount(dto.ToCurrencyId);
+
+                    details.Add(new TransactionDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        TransactionId = transaction.Id,
+                        AccountId = revenueAccount.Id,
+                        CurrencyId = dto.ToCurrencyId,
+                        Amount = revenueInToCurrency,
+                        EntryType = 2, // CREDIT
+                        UserId = _currentUser.UserId,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                // ✅ SAVE
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                _context.Exchanges.Add(new Exchange
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    FromAccountId = dto.FromAccountId,
+                    ToAccountId = dto.ToAccountId,
+                    FromAmount = dto.FromAmount,
+                    ToAmount = grossToAmount, // before fee
+                    NetAmount = finalAmount,
+                    Rate = toRate,
+                    Fee = fee,
+                    Profit = profit,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+            }, "Exchange created", "Error");
+        }
+        private async Task<Account> GetRevenueAccount(int currencyId)
+        {
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.AccountType == AccountTypeEnum.Revenue &&
+                    a.CurrencyId == currencyId &&
+                    a.Name.Contains("Exchange Profit"));
+
+            if (account == null)
+                throw new Exception($"Exchange Profit account lama helin currencyId: {currencyId}");
+
+            return account;
+        }
+
+        private async Task<ExchangeSettings> GetExchangeSettings(int currencyId)
+        {
+            var settings = await _context.ExchangeSettings
+                .FirstOrDefaultAsync(x => x.CurrencyId == currencyId && x.IsActive);
+
+            if (settings == null)
+                throw new Exception($"Exchange settings lama helin currencyId: {currencyId}");
+
+            return settings;
+        }
+
+
+        private async Task<ResponseWrapper<Guid>> CreateDepositAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Deposit;
+
+            var account = await GetAccountAsync(dto.AccountId);
+
+            var currencyId = account.CurrencyId;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Deposit required");
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(
+                    request,
+                    dto.Amount,
+                    referenceNo
+                );
+
+                var details = new List<TransactionDetail>
+        {
+            // 🟢 DEBIT (Cash / Bank)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.AccountId, // lacagta soo gashay
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1, // DEBIT
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🔴 CREDIT (Customer Liability / Payable)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = await GetCustomerPayableAccount(dto.CustomerId),
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2, // CREDIT
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                // Optional: Deposit Table
+                _context.Deposits.Add(new Deposit
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    AccountId = dto.AccountId,
+                    CustomerId = dto.CustomerId,
+                    Amount = dto.Amount,
+                    DepositNo = referenceNo,
+                    CurrencyId = currencyId,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    UserId =_currentUser.UserId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Deposit created", "Error creating deposit");
+        }
+
+
+        private async Task<ResponseWrapper<Guid>> CreateWithdrawAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Withdraw;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Withdraw required");
+
+            var account = await GetAccountAsync(dto.AccountId);
+            var currencyId = account.CurrencyId;
+
+            // 🔒 check balance
+            var customerAccountId = await GetCustomerPayableAccount(dto.CustomerId);
+
+            var balance = await _context.TransactionDetails
+                 .Where(x => x.AccountId == customerAccountId)
+                 .SumAsync(x => x.EntryType == 2 ? x.Amount : -x.Amount);
+
+            if (dto.Amount > balance)
+                return await ResponseWrapper<Guid>.FailureAsync("Insufficient balance");
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🔴 CREDIT (Cash goes out)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.AccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🟢 DEBIT (Reduce payable)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = customerAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                // Optional Withdraw table
+                _context.Withdraws.Add(new Withdraw
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    AccountId = dto.AccountId,
+                    CustomerId = dto.CustomerId,
+                    Amount = dto.Amount,
+                    CurrencyId = currencyId,
+                    ReceiverName = dto.ReceiverName,
+                    ReceiverIdCard = dto.ReceiverIdCard,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    UserId =_currentUser.UserId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Withdraw created", "Error creating withdraw");
+        }
+
+
+
+        private async Task<ResponseWrapper<Guid>> CreateLoanAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Loan;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Loan required");
+
+            var account = await GetAccountAsync(dto.AccountId);
+            var currencyId = account.CurrencyId;
+
+            var receivableAccountId = await GetCustomerReceivableAccount(dto.CustomerId);
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(
+                    request,
+                    dto.PrincipalAmount,
+                    referenceNo
+                );
+
+                var details = new List<TransactionDetail>
+        {
+            // 🔴 CREDIT (Cash goes out)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.AccountId,
+                CurrencyId = currencyId,
+                Amount = dto.PrincipalAmount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🟢 DEBIT (Receivable)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = receivableAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.PrincipalAmount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                _context.Loans.Add(new Loan
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    AccountId = dto.AccountId,
+                    CustomerId = dto.CustomerId,
+                    PrincipalAmount = dto.PrincipalAmount,
+                    InterestRate = dto.InterestRate,
+                    StartDate = DateTime.UtcNow,
+                    DueDate = dto.DueDate,
+                    LoanNo=referenceNo,
+                    PaidAmount = 0,
+                    CurrencyId = currencyId,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    UserId = _currentUser.UserId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+                
+            }, "Loan created", "Error creating loan");
+        }
+
+        private async Task<ResponseWrapper<Guid>> CreateRepaymentAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Repayment;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Repayment required");
+
+            var cashAccount = await GetAccountAsync(dto.CashAccountId);
+            var currencyId = cashAccount.CurrencyId;
+
+            var loan = await _context.Loans
+                .FirstOrDefaultAsync(x => x.Id == dto.LoanId);
+
+            if (loan == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Loan not found");
+
+            // 👉 receivable account (customer)
+            var receivableAccountId = await GetCustomerReceivableAccount(loan.CustomerId);
+
+            // 🔒 validation
+            var remaining = loan.PrincipalAmount - loan.PaidAmount;
+
+            if (dto.Amount > remaining)
+                return await ResponseWrapper<Guid>.FailureAsync("Amount exceeds remaining loan");
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🟢 DEBIT (Cash comes in)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.CashAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🔴 CREDIT (Reduce receivable)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = receivableAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                // update loan
+                loan.PaidAmount += dto.Amount;
+
+                if (loan.PaidAmount >= loan.PrincipalAmount)
+                    loan.Status = LoanStatusEnum.Closed;
+
+                // save repayment
+                _context.LoanPayments.Add(new LoanPayment
+                {
+                    Id = Guid.NewGuid(),
+                    LoanId = dto.LoanId,
+                    Amount = dto.Amount,
+                    Note = dto.Note,
+                    TransactionId = transaction.Id,
+                    CashAccountId = dto.CashAccountId,
+                    LoanAccountId = receivableAccountId,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    PaymentDate = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Repayment created", "Error creating repayment");
+        }
+
+
+
+        private async Task<ResponseWrapper<Guid>> CreateTransferAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Transfer;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Transfer required");
+
+            var fromAccount = await GetAccountAsync(dto.FromAccountId);
+            var toAccount = await GetAccountAsync(dto.ToAccountId);
+
+            // 🔒 validation
+            if (fromAccount.CurrencyId != toAccount.CurrencyId)
+                return await ResponseWrapper<Guid>.FailureAsync("Currency mismatch");
+
+            var currencyId = fromAccount.CurrencyId;
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🔴 CREDIT (FromAccount → lacag baxday)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.FromAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🟢 DEBIT (ToAccount → lacag soo gashay)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.ToAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                _context.Transfers.Add(new Transfer
+                {
+                    Id = Guid.NewGuid(),
+                    TransactionId = transaction.Id,
+                    FromAccountId = dto.FromAccountId,
+                    ToAccountId = dto.ToAccountId,
+                    Amount = dto.Amount,
+                    SenderName = dto.SenderName,
+                    ReceiverName = dto.ReceiverName,
+                    Status = TransferStatusEnum.Completed,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    UserId =_currentUser.UserId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Transfer created", "Error creating transfer");
+        }
+
+
+        private async Task<ResponseWrapper<Guid>> CreateExpenseAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Expense;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Expense required");
+
+            var expenseAccount = await GetAccountAsync(dto.AccountId);
+            var cashAccount = await GetAccountAsync(dto.CashAccountId);
+
+            if (expenseAccount.CurrencyId != cashAccount.CurrencyId)
+                return await ResponseWrapper<Guid>.FailureAsync("Currency mismatch");
+
+            var currencyId = cashAccount.CurrencyId;
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🟢 DEBIT (Expense)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.AccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🔴 CREDIT (Cash out)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.CashAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                _context.Expenses.Add(new Expense
+                {
+                    Id = Guid.NewGuid(),
+                    Title = dto.Title,
+                    Description = dto.Description,
+                    Amount = dto.Amount,
+                    AccountId = dto.AccountId,
+                    TransactionId = transaction.Id,
+                    ExpenseDate =DateTime.UtcNow,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Expense created", "Error creating expense");
+        }
+
+        private async Task<ResponseWrapper<Guid>> CreateRevenueAsync(CreateTransactionRequest request)
+        {
+            var dto = request.Revenue;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Revenue required");
+
+            var cashAccount = await GetAccountAsync(dto.CashAccountId);
+            var revenueAccount = await GetAccountAsync(dto.RevenueAccountId);
+
+            if (cashAccount.CurrencyId != revenueAccount.CurrencyId)
+                return await ResponseWrapper<Guid>.FailureAsync("Currency mismatch");
+
+            var currencyId = cashAccount.CurrencyId;
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            // 🟢 DEBIT (Cash ↑)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.CashAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            // 🔴 CREDIT (Revenue ↑)
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.RevenueAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2,
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                _context.Revenues.Add(new Revenue
+                {
+                    Id = Guid.NewGuid(),
+                    Title = dto.Title,
+                    Description = dto.Description,
+                    Amount = dto.Amount,
+                    RevenueAccountId = dto.RevenueAccountId,
+                    CashAccountId = dto.CashAccountId,
+                    SourceType = dto.SourceType,
+                    TransactionId = transaction.Id,
+                    AgencyId = _currentUser.AgencyId,
+                    BranchId = _currentUser.BranchId,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Revenue created", "Error creating revenue");
+        }
+
+
+        private async Task<Guid> GetCustomerPayableAccount(Guid customerId)
+        {
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.AccountType == AccountTypeEnum.PAYABLE &&
+                    a.ReferenceId == customerId
+                );
+
+            if (account == null)
+                throw new Exception("Customer payable account not found");
+
+            return account.Id;
+        }
+
+        private async Task<Guid> GetCustomerReceivableAccount(Guid customerId)
+        {
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.AccountType == AccountTypeEnum.RECEIVABLE &&
+                    a.ReferenceId == customerId
+                );
+
+            if (account == null)
+                throw new Exception("Customer receivable account not found");
+
+            return account.Id;
+        }
+
+        private async Task<Account> GetAccountAsync(Guid accountId)
+        {
+            var account = await _context.Accounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == accountId &&
+                    x.AgencyId == _currentUser.AgencyId
+                );
+
+            if (account == null)
+                throw new Exception("Account not found");
+
+            return account;
+        }
+
+
+
+        private Transaction CreateBaseTransaction(CreateTransactionRequest request, decimal totalAmount, string referenceNo)
+        {
+            return new Transaction
+            {
+                Id = Guid.NewGuid(),
+                ReferenceNo = referenceNo,  // ✔ no await here
+                TransactionType =request.TransactionType,
+                Description = request.Description,
+                UserId = _currentUser.UserId,
+                AgencyId = _currentUser.AgencyId,
+                BranchId = _currentUser.BranchId,
+                CreatedAt = DateTime.UtcNow,
+                TotalAmount = totalAmount
+            };
+        }
+
+        private async Task<Dictionary<int, decimal>> GetRates(params int[] ids)
+        {
+            return await _context.ExchangeRates
+                .Where(x => ids.Contains(x.CurrencyId))
+                .GroupBy(x => x.CurrencyId)
+                .ToDictionaryAsync(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.CreatedAt).First().Rate
+                );
+        }
+
+
 
 
 
@@ -441,473 +1308,473 @@ namespace Backend.Services.Accounts
         // ================================
         // CREATE TRANSACTION
         // ================================
-        public async Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionDto dto)
+        //    public async Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionDto dto)
+        //    {
+        //        // 0. Hubi Aqoonsiga User-ka
+        //        if (string.IsNullOrEmpty(_currentUser.UserId))
+        //            return await ResponseWrapper<Guid>.FailureAsync("Unauthorized", "User not authenticated", 401);
+
+        //        // 1. Hubi Currencies-ka iyo Nooca Transaction-ka
+        //        var distinctCurrencies = dto.Details.Select(d => d.CurrencyId).Distinct().ToList();
+        //        bool isMultiCurrency = distinctCurrencies.Count > 1;
+
+        //        // 2. Business Logic Validation (Xeerarka Noocyada)
+        //        switch ((TransactionTypeEnum)dto.TransactionType)
+        //        {
+        //            case TransactionTypeEnum.Deposit:
+        //            case TransactionTypeEnum.Withdraw:
+        //            case TransactionTypeEnum.Transfer:
+        //                if (isMultiCurrency)
+        //                    return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Noocan transaction-ka ah ma oggola laba lacag oo kala duwan.");
+        //                break;
+
+        //            case TransactionTypeEnum.Exchange:
+        //                if (!isMultiCurrency)
+        //                    return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Sarifka (Exchange) waa inuu ka koobnaadaa ugu yaraan laba lacag oo kala duwan.");
+        //                break;
+
+        //            default:
+        //                // Noocyada kale sida Loan/Expense waxay u baahan karaan validation u gaar ah mustaqbalka
+        //                break;
+        //        }
+
+        //        // 3. HEL EXCHANGE RATES (Kaliya haddii ay lagama maarmaan tahay)
+        //        Dictionary<int, decimal> rates = new();
+        //        if (isMultiCurrency)
+        //        {
+        //                        rates = await _context.ExchangeRates
+        //            .Where(r => distinctCurrencies.Contains(r.CurrencyId))
+        //            .GroupBy(r => r.CurrencyId)
+        //            .ToDictionaryAsync(
+        //                g => g.Key,
+        //                g => g.OrderByDescending(x => x.CreatedAt).First().Rate
+        //);
+        //        }
+
+        //        // 4. DOUBLE-ENTRY VALIDATION
+        //        decimal totalDebitBase = 0;
+        //        decimal totalCreditBase = 0;
+
+        //        foreach (var d in dto.Details)
+        //        {
+        //            decimal amountInBase;
+
+        //            if (isMultiCurrency)
+        //            {
+        //                if (!rates.TryGetValue(d.CurrencyId, out decimal rate) || rate <= 0)
+        //                    return await ResponseWrapper<Guid>.FailureAsync("Rate Error", $"Exchange rate-ka lama helin Currency ID: {d.CurrencyId}");
+
+        //                amountInBase = d.Amount / rate;
+        //            }
+        //            else
+        //            {
+        //                amountInBase = d.Amount;
+        //            }
+
+        //            if (d.EntryType == 1) totalDebitBase += amountInBase; // 1 = Debit
+        //            else if (d.EntryType == 2) totalCreditBase += amountInBase; // 2 = Credit
+        //        }
+
+        //        // 5. Isbarbardhig (Balance Check)
+        //        decimal diff = Math.Abs(totalDebitBase - totalCreditBase);
+        //        decimal allowedTolerance = isMultiCurrency ? 0.01m : 0m;
+
+        //        if (diff > allowedTolerance)
+        //        {
+        //            return await ResponseWrapper<Guid>.FailureAsync("Validation Error",
+        //                $"Transaction-ku ma dheelli tirna (Out of balance). Difference: {diff:N2}");
+        //        }
+
+        //        // 6. DIIWAANGELINTA (DATABASE WRITE)
+        //        return await ExecuteWriteAsync(async () =>
+        //        {
+        //            using var dbTransaction = await _context.Database.BeginTransactionAsync();
+        //            try
+        //            {
+        //                var transaction = _mapper.Map<Transaction>(dto);
+        //                transaction.ReferenceNo = await GenerateReferenceNoAsync();
+        //                transaction.Id = Guid.NewGuid();
+        //                transaction.UserId = _currentUser.UserId;
+        //                transaction.AgencyId = _currentUser.AgencyId;
+        //                transaction.BranchId = _currentUser.BranchId;
+        //                transaction.CreatedAt = DateTime.UtcNow;
+        //                transaction.TotalAmount = totalDebitBase; // USD Base Value
+
+        //                foreach (var detail in transaction.Details)
+        //                {
+        //                    detail.Id = Guid.NewGuid();
+        //                    detail.TransactionId = transaction.Id;
+        //                    detail.UserId = _currentUser.UserId;
+        //                    detail.TransactionType = transaction.TransactionType;
+        //                    detail.CreatedAt = DateTime.UtcNow;
+        //                    // detail.AgencyId = _currentUser.AgencyId; // Haddii aad ku haysato Detail Table-ka
+        //                }
+
+        //                _context.Transactions.Add(transaction);
+
+
+
+
+        //                // ============================================================
+        //                // TUSAALE: KAYDINTA METADATA-DA (EXCHANGE)
+        //                // ============================================================
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Exchange)
+        //                {
+
+        //                    var toDetails = dto.Details.FirstOrDefault(d => d.EntryType == 1);
+
+        //                    if (toDetails == null)
+        //                        throw new Exception("Destination account lama helin");
+
+        //                    if (!rates.TryGetValue(toDetails.CurrencyId, out decimal rate))
+        //                        throw new Exception("Exchange rate lama helin");
+
+        //                    var exchange = new Exchange
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id,
+        //                        Rate = rate,
+        //                        Fee = dto.Fee ?? 0,
+        //                        Profit = dto.Profit ?? 0,
+
+        //                        // Helitaanka Account-yada (From/To)
+        //                        // EntryType 1 = Debit (Gashay), 2 = Credit (Baxday)
+        //                        FromAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.AccountId ?? Guid.Empty,
+        //                        ToAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.AccountId ?? Guid.Empty,
+
+        //                        FromAmount = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.Amount ?? 0,
+        //                        ToAmount = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.Amount ?? 0,
+
+        //                        // Metadata-da kale
+        //                        CreatedAt = DateTime.UtcNow,
+        //                        UpdatedAt = DateTime.UtcNow,
+        //                        BranchId = _currentUser.BranchId,
+        //                        AgencyId = _currentUser.AgencyId
+
+        //                    };
+
+        //                    decimal totalRevenue = (dto.Profit ?? 0) + (dto.Fee ?? 0);
+
+        //                    if (totalRevenue > 0)
+
+        //                    {
+
+        //                        var toDetail = dto.Details.FirstOrDefault(d => d.EntryType == 1);
+
+        //                        if (toDetail == null)
+        //                            throw new Exception("Destination account lama helin");
+
+        //                        var currencyId = toDetail.CurrencyId;
+
+        //                        // 🔥 Hel Revenue Account
+        //                        var revenueAccount = await _context.Accounts
+        //                            .FirstOrDefaultAsync(a =>
+        //                                a.AccountType == AccountTypeEnum.Revenue &&
+        //                                a.CurrencyId == currencyId &&
+        //                                a.Name.Contains("Exchange Profit"));
+
+        //                        // ❗ HUBI HALKAN KA HOR ISTICMAAL
+        //                        if (revenueAccount == null)
+        //                            throw new Exception($"Exchange Profit account lama helin currencyId: {currencyId}");
+
+
+        //                        // 👉 Debit (Cash)
+        //                        // 👉 Debit (Cash)
+        //                        _context.TransactionDetails.Add(new TransactionDetail
+        //                        {
+        //                            Id = Guid.NewGuid(),
+        //                            TransactionId = transaction.Id,
+        //                            AccountId = toDetail.AccountId,
+        //                            CurrencyId = toDetail.CurrencyId, // ✅ ADD THIS
+        //                            Amount = totalRevenue,
+        //                            EntryType = 1,
+        //                            UserId = _currentUser.UserId,
+        //                            TransactionType = transaction.TransactionType,
+        //                            CreatedAt = DateTime.UtcNow
+        //                        });
+
+        //                        // 👉 Credit (Revenue)
+        //                        _context.TransactionDetails.Add(new TransactionDetail
+        //                        {
+        //                            Id = Guid.NewGuid(),
+        //                            TransactionId = transaction.Id,
+        //                            AccountId = revenueAccount.Id,
+        //                            CurrencyId = currencyId, // ✅ ADD THIS
+        //                            Amount = totalRevenue,
+        //                            EntryType = 2,
+        //                            UserId = _currentUser.UserId,
+        //                            TransactionType = transaction.TransactionType,
+        //                            CreatedAt = DateTime.UtcNow
+        //                        });
+
+        //                        // 👉 Save Revenue table
+        //                        var autoRevenue = new Revenue
+        //                        {
+        //                            Id = Guid.NewGuid(),
+        //                            TransactionId = transaction.Id,
+        //                            Title = $"Exchange Profit/Fee - Ref: {transaction.ReferenceNo}",
+        //                            Amount = totalRevenue,
+        //                            RevenueAccountId = revenueAccount.Id,
+        //                            CashAccountId = toDetail.AccountId,
+        //                            SourceType = RevenueSourceEnum.Exchange,
+        //                            AgencyId = _currentUser.AgencyId,
+        //                            CreatedAt = DateTime.UtcNow
+        //                        };
+
+        //                        _context.Revenues.Add(autoRevenue);
+        //                    }
+
+
+
+        //                    _context.Exchanges.Add(exchange);
+        //                }
+
+        //                // TUSAALE KALE: TRANSFER
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Transfer)
+        //                {
+        //                    if (dto.TransferDetails == null)
+        //                    {
+        //                        // Hubi in xogta Transfer-ka la soo diray
+        //                        throw new Exception("Xogta Transfer-ka waa lagama maarmaan.");
+        //                    }
+
+        //                    var transfer = new Transfer
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id, // Ku xir Transaction-ka weyn
+
+        //                        // Xogta laga soo minguuriyay TransferDetails DTO
+        //                        SenderName = dto.TransferDetails.SenderName,
+        //                        ReceiverName = dto.TransferDetails.ReceiverName,
+        //                        FromAccountId = dto.TransferDetails.FromAccountId,
+        //                        ToAccountId = dto.TransferDetails.ToAccountId,
+        //                        Amount = dto.TransferDetails.Amount,
+
+        //                        // Laamaha (Branches)
+        //                        FromBranchId = _currentUser.BranchId,
+        //                        ToBranchId = _currentUser.BranchId,
+        //                        AgencyId =_currentUser.AgencyId,
+
+        //                        CreatedAt = DateTime.UtcNow,
+        //                        UpdatedAt = DateTime.UtcNow
+        //                    };
+
+        //                    _context.Transfers.Add(transfer);
+        //                }
+
+
+        //                // TUSAALE: LOAN (DAYN)
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Loan)
+        //                {
+        //                    if (dto.LoanDetails == null)
+        //                        throw new Exception("Xogta Loan-ka waa lagama maarmaan.");
+
+        //                    var loan = new Loan
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id, // Ku xir xawaaladda/transaction-ka
+
+        //                        LoanNo = dto.LoanDetails.LoanNo ?? $"LN-{DateTime.Now.Ticks}",
+        //                        PrincipalAmount = dto.LoanDetails.PrincipalAmount,
+        //                        InterestRate = dto.LoanDetails.InterestRate ?? 0,
+
+        //                        StartDate = dto.LoanDetails.StartDate ?? DateTime.UtcNow,
+        //                        DueDate = dto.LoanDetails.DueDate,
+        //                        PaidAmount = 0, // Marka la bilaabayo waa 0
+
+        //                        AccountId = dto.LoanDetails.AccountId,
+        //                        CustomerId = dto.LoanDetails.CustomerId,
+
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+
+        //                        CreatedAt = DateTime.UtcNow,
+        //                        UpdatedAt = DateTime.UtcNow
+        //                    };
+
+        //                    _context.Loans.Add(loan);
+        //                }
+
+        //                // TUSAALE: EXPENSE (KHARASH)
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Expense)
+        //                {
+        //                    if (dto.ExpenseDetails == null)
+        //                        throw new Exception("Xogta Kharashka (Expense) waa lagama maarmaan.");
+
+        //                    var expense = new Expense
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id, // Link-ga muhiimka ah
+
+        //                        Title = dto.ExpenseDetails.Title,
+        //                        Description = dto.ExpenseDetails.Description,
+        //                        Amount = dto.ExpenseDetails.Amount,
+
+        //                        AccountId = dto.ExpenseDetails.AccountId, // Expense Account-ka (tusaale: Kirada)
+        //                        ExpenseDate = dto.ExpenseDetails.ExpenseDate ?? DateTime.UtcNow,
+
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+        //                        CreatedAt = DateTime.UtcNow,
+        //                        UpdatedAt = DateTime.UtcNow
+        //                    };
+
+        //                    _context.Expenses.Add(expense);
+        //                }
+
+
+        //                // TUSAALE: DEPOSIT (LACAG DHIGASHO)
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Deposit)
+        //                {
+        //                    if (dto.DepositDetails == null)
+        //                        throw new Exception("Xogta Deposit-ka waa lagama maarmaan.");
+
+        //                    var deposit = new Deposit
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id, // Link-ga Transaction-ka weyn
+
+        //                        DepositNo = dto.DepositDetails.DepositNo ?? $"DEP-{DateTime.Now.Ticks}",
+        //                        AccountId = dto.DepositDetails.AccountId,
+        //                        CustomerId = dto.DepositDetails.CustomerId,
+        //                        CurrencyId = dto.DepositDetails.CurrencyId,
+
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+
+        //                        CreatedAt = DateTime.UtcNow,
+        //                        UpdatedAt = DateTime.UtcNow
+        //                    };
+
+        //                    _context.Deposits.Add(deposit);
+        //                }
+
+
+
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Withdraw)
+        //                {
+        //                    if (dto.WithdrawDetails == null)
+        //                        throw new Exception("Xogta Withdraw-ga waa lagama maarmaan.");
+
+        //                    var withdraw = new Withdraw
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id,
+        //                        WithdrawNo = dto.WithdrawDetails.WithdrawNo ?? $"WD-{DateTime.Now.Ticks}",
+
+        //                        AccountId = dto.WithdrawDetails.AccountId,
+        //                        CustomerId = dto.WithdrawDetails.CustomerId,
+        //                        CurrencyId = dto.WithdrawDetails.CurrencyId,
+
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+
+        //                        WithdrawnAt = DateTime.UtcNow,
+        //                        // Haddii aad metadata-da dheeraadka ah rabto:
+        //                        ReceiverName = dto.WithdrawDetails.ReceiverName,
+        //                        ReceiverIdCard = dto.WithdrawDetails.ReceiverIdCard
+        //                    };
+
+        //                    _context.Withdraws.Add(withdraw);
+        //                }
+
+
+        //                // REPAYMENT LOGIC
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Repayment)
+        //                {
+        //                    if (dto.RepaymentDetails == null)
+        //                        throw new Exception("Xogta Repayment-ka waa lagama maarmaan.");
+
+        //                    var loan = await _context.Loans
+        //                        .FirstOrDefaultAsync(l => l.Id == dto.RepaymentDetails.LoanId);
+
+        //                    if (loan == null)
+        //                        throw new Exception("Deyntan lama helin!");
+
+        //                    var remainingBalance = loan.PrincipalAmount - loan.PaidAmount;
+        //                    if (dto.RepaymentDetails.Amount > remainingBalance)
+        //                    {
+        //                        throw new Exception($"Lacagta la bixinayo ({dto.RepaymentDetails.Amount}) way ka badantahay baaqiga haray ({remainingBalance})");
+        //                    }
+
+        //                    // 1. Update garee lacagta ilaa hadda la bixiyey
+        //                    loan.PaidAmount += dto.RepaymentDetails.Amount;
+        //                    loan.UpdatedAt = DateTime.UtcNow;
+
+        //                    // --- QAYBTA CUSUB: UPDATE STATUS ---
+        //                    // Haddii lacagta la bixiyey ay la mid tahay ama ka badato deyntii asalka ahayd
+        //                    if (loan.PaidAmount >= loan.PrincipalAmount)
+        //                    {
+        //                        // Halkan geli Status-ka aad u isticmaasho "Paid" ama "Closed"
+        //                        // Tusaale: 1 = Active, 2 = Paid/Closed
+        //                        loan.Status = LoanStatusEnum.Closed;
+        //                    }
+        //                    // ------------------------------------
+
+        //                    var payment = new LoanPayment
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id,
+        //                        LoanId = loan.Id,
+        //                        Amount = dto.RepaymentDetails.Amount,
+        //                        PaymentDate = DateTime.UtcNow,
+        //                        Note = dto.RepaymentDetails.Note,
+        //                        CashAccountId = dto.RepaymentDetails.CashAccountId,
+        //                        LoanAccountId = dto.RepaymentDetails.LoanAccountId,
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+        //                        UserId = _currentUser.UserId
+        //                    };
+
+        //                    _context.LoanPayments.Add(payment);
+        //                }
+
+
+
+        //                // ============================================================
+        //                // REVENUE LOGIC (DIRECT) - Haddii uu yahay dakhli toos ah
+        //                // ============================================================
+        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Revenue)
+        //                {
+        //                    if (dto.RevenueDetails == null)
+        //                        throw new Exception("Xogta Dakhliga (Revenue) waa lagama maarmaan.");
+
+        //                    var revenue = new Revenue
+        //                    {
+        //                        Id = Guid.NewGuid(),
+        //                        TransactionId = transaction.Id,
+        //                        Title = dto.RevenueDetails.Title,
+        //                        Amount = dto.RevenueDetails.Amount,
+        //                        RevenueAccountId = dto.RevenueDetails.RevenueAccountId,
+        //                        CashAccountId = dto.RevenueDetails.CashAccountId,
+        //                        SourceType = RevenueSourceEnum.Direct,
+        //                        AgencyId = _currentUser.AgencyId,
+        //                        BranchId = _currentUser.BranchId,
+        //                        CreatedAt = DateTime.UtcNow
+        //                    };
+        //                    _context.Revenues.Add(revenue);
+        //                }
+
+
+
+
+
+        //                await _context.SaveChangesAsync();
+        //                await dbTransaction.CommitAsync();
+
+        //                RemoveByPrefix(TransactionCacheKey);
+        //                return transaction.Id;
+        //            }
+        //            catch (Exception)
+        //            {
+        //                await dbTransaction.RollbackAsync();
+        //                throw;
+        //            }
+        //        }, "Transaction-ka waa la diiwaangeliyay", "Cillad ayaa dhacday xilliga diiwaangelinta");
+        //    }
+        private string GenerateReferenceNo()
         {
-            // 0. Hubi Aqoonsiga User-ka
-            if (string.IsNullOrEmpty(_currentUser.UserId))
-                return await ResponseWrapper<Guid>.FailureAsync("Unauthorized", "User not authenticated", 401);
-
-            // 1. Hubi Currencies-ka iyo Nooca Transaction-ka
-            var distinctCurrencies = dto.Details.Select(d => d.CurrencyId).Distinct().ToList();
-            bool isMultiCurrency = distinctCurrencies.Count > 1;
-
-            // 2. Business Logic Validation (Xeerarka Noocyada)
-            switch ((TransactionTypeEnum)dto.TransactionType)
-            {
-                case TransactionTypeEnum.Deposit:
-                case TransactionTypeEnum.Withdraw:
-                case TransactionTypeEnum.Transfer:
-                    if (isMultiCurrency)
-                        return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Noocan transaction-ka ah ma oggola laba lacag oo kala duwan.");
-                    break;
-
-                case TransactionTypeEnum.Exchange:
-                    if (!isMultiCurrency)
-                        return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Sarifka (Exchange) waa inuu ka koobnaadaa ugu yaraan laba lacag oo kala duwan.");
-                    break;
-
-                default:
-                    // Noocyada kale sida Loan/Expense waxay u baahan karaan validation u gaar ah mustaqbalka
-                    break;
-            }
-
-            // 3. HEL EXCHANGE RATES (Kaliya haddii ay lagama maarmaan tahay)
-            Dictionary<int, decimal> rates = new();
-            if (isMultiCurrency)
-            {
-                            rates = await _context.ExchangeRates
-                .Where(r => distinctCurrencies.Contains(r.CurrencyId))
-                .GroupBy(r => r.CurrencyId)
-                .ToDictionaryAsync(
-                    g => g.Key,
-                    g => g.OrderByDescending(x => x.CreatedAt).First().Rate
-    );
-            }
-
-            // 4. DOUBLE-ENTRY VALIDATION
-            decimal totalDebitBase = 0;
-            decimal totalCreditBase = 0;
-
-            foreach (var d in dto.Details)
-            {
-                decimal amountInBase;
-
-                if (isMultiCurrency)
-                {
-                    if (!rates.TryGetValue(d.CurrencyId, out decimal rate) || rate <= 0)
-                        return await ResponseWrapper<Guid>.FailureAsync("Rate Error", $"Exchange rate-ka lama helin Currency ID: {d.CurrencyId}");
-
-                    amountInBase = d.Amount / rate;
-                }
-                else
-                {
-                    amountInBase = d.Amount;
-                }
-
-                if (d.EntryType == 1) totalDebitBase += amountInBase; // 1 = Debit
-                else if (d.EntryType == 2) totalCreditBase += amountInBase; // 2 = Credit
-            }
-
-            // 5. Isbarbardhig (Balance Check)
-            decimal diff = Math.Abs(totalDebitBase - totalCreditBase);
-            decimal allowedTolerance = isMultiCurrency ? 0.01m : 0m;
-
-            if (diff > allowedTolerance)
-            {
-                return await ResponseWrapper<Guid>.FailureAsync("Validation Error",
-                    $"Transaction-ku ma dheelli tirna (Out of balance). Difference: {diff:N2}");
-            }
-
-            // 6. DIIWAANGELINTA (DATABASE WRITE)
-            return await ExecuteWriteAsync(async () =>
-            {
-                using var dbTransaction = await _context.Database.BeginTransactionAsync();
-                try
-                {
-                    var transaction = _mapper.Map<Transaction>(dto);
-                    transaction.ReferenceNo = await GenerateReferenceNoAsync();
-                    transaction.Id = Guid.NewGuid();
-                    transaction.UserId = _currentUser.UserId;
-                    transaction.AgencyId = _currentUser.AgencyId;
-                    transaction.BranchId = _currentUser.BranchId;
-                    transaction.CreatedAt = DateTime.UtcNow;
-                    transaction.TotalAmount = totalDebitBase; // USD Base Value
-
-                    foreach (var detail in transaction.Details)
-                    {
-                        detail.Id = Guid.NewGuid();
-                        detail.TransactionId = transaction.Id;
-                        detail.UserId = _currentUser.UserId;
-                        detail.TransactionType = transaction.TransactionType;
-                        detail.CreatedAt = DateTime.UtcNow;
-                        // detail.AgencyId = _currentUser.AgencyId; // Haddii aad ku haysato Detail Table-ka
-                    }
-
-                    _context.Transactions.Add(transaction);
-
-
-
-
-                    // ============================================================
-                    // TUSAALE: KAYDINTA METADATA-DA (EXCHANGE)
-                    // ============================================================
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Exchange)
-                    {
-                        var exchange = new Exchange
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id,
-                            Rate = dto.ExchangeRate ?? 0,
-                            Fee = dto.Fee ?? 0,
-                            Profit = dto.Profit ?? 0,
-
-                            // Helitaanka Account-yada (From/To)
-                            // EntryType 1 = Debit (Gashay), 2 = Credit (Baxday)
-                            FromAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.AccountId ?? Guid.Empty,
-                            ToAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.AccountId ?? Guid.Empty,
-
-                            FromAmount = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.Amount ?? 0,
-                            ToAmount = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.Amount ?? 0,
-
-                            // Metadata-da kale
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow,
-                            BranchId =_currentUser.BranchId,
-                            AgencyId =_currentUser.AgencyId
-                            
-                        };
-
-                        decimal totalRevenue = (dto.Profit ?? 0) + (dto.Fee ?? 0);
-
-                        if (totalRevenue > 0)
-
-                        {
-
-                            var toDetail = dto.Details.FirstOrDefault(d => d.EntryType == 1);
-
-                            if (toDetail == null)
-                                throw new Exception("Destination account lama helin");
-
-                            var currencyId = toDetail.CurrencyId;
-
-                            // 🔥 Hel Revenue Account
-                            var revenueAccount = await _context.Accounts
-                                .FirstOrDefaultAsync(a =>
-                                    a.AccountType == AccountTypeEnum.Revenue &&
-                                    a.CurrencyId == currencyId &&
-                                    a.Name.Contains("Exchange Profit"));
-
-                            // ❗ HUBI HALKAN KA HOR ISTICMAAL
-                            if (revenueAccount == null)
-                                throw new Exception($"Exchange Profit account lama helin currencyId: {currencyId}");
-
-
-                            // 👉 Debit (Cash)
-                            // 👉 Debit (Cash)
-                            _context.TransactionDetails.Add(new TransactionDetail
-                            {
-                                Id = Guid.NewGuid(),
-                                TransactionId = transaction.Id,
-                                AccountId = toDetail.AccountId,
-                                CurrencyId = toDetail.CurrencyId, // ✅ ADD THIS
-                                Amount = totalRevenue,
-                                EntryType = 1,
-                                UserId = _currentUser.UserId,
-                                TransactionType = transaction.TransactionType,
-                                CreatedAt = DateTime.UtcNow
-                            });
-
-                            // 👉 Credit (Revenue)
-                            _context.TransactionDetails.Add(new TransactionDetail
-                            {
-                                Id = Guid.NewGuid(),
-                                TransactionId = transaction.Id,
-                                AccountId = revenueAccount.Id,
-                                CurrencyId = currencyId, // ✅ ADD THIS
-                                Amount = totalRevenue,
-                                EntryType = 2,
-                                UserId = _currentUser.UserId,
-                                TransactionType = transaction.TransactionType,
-                                CreatedAt = DateTime.UtcNow
-                            });
-
-                            // 👉 Save Revenue table
-                            var autoRevenue = new Revenue
-                            {
-                                Id = Guid.NewGuid(),
-                                TransactionId = transaction.Id,
-                                Title = $"Exchange Profit/Fee - Ref: {transaction.ReferenceNo}",
-                                Amount = totalRevenue,
-                                RevenueAccountId = revenueAccount.Id,
-                                CashAccountId = toDetail.AccountId,
-                                SourceType = RevenueSourceEnum.Exchange,
-                                AgencyId = _currentUser.AgencyId,
-                                CreatedAt = DateTime.UtcNow
-                            };
-
-                            _context.Revenues.Add(autoRevenue);
-                        }
-
-
-
-                        _context.Exchanges.Add(exchange);
-                    }
-
-                    // TUSAALE KALE: TRANSFER
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Transfer)
-                    {
-                        if (dto.TransferDetails == null)
-                        {
-                            // Hubi in xogta Transfer-ka la soo diray
-                            throw new Exception("Xogta Transfer-ka waa lagama maarmaan.");
-                        }
-
-                        var transfer = new Transfer
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id, // Ku xir Transaction-ka weyn
-
-                            // Xogta laga soo minguuriyay TransferDetails DTO
-                            SenderName = dto.TransferDetails.SenderName,
-                            ReceiverName = dto.TransferDetails.ReceiverName,
-                            FromAccountId = dto.TransferDetails.FromAccountId,
-                            ToAccountId = dto.TransferDetails.ToAccountId,
-                            Amount = dto.TransferDetails.Amount,
-
-                            // Laamaha (Branches)
-                            FromBranchId = _currentUser.BranchId,
-                            ToBranchId = _currentUser.BranchId,
-                            AgencyId =_currentUser.AgencyId,
-
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        _context.Transfers.Add(transfer);
-                    }
-
-
-                    // TUSAALE: LOAN (DAYN)
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Loan)
-                    {
-                        if (dto.LoanDetails == null)
-                            throw new Exception("Xogta Loan-ka waa lagama maarmaan.");
-
-                        var loan = new Loan
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id, // Ku xir xawaaladda/transaction-ka
-
-                            LoanNo = dto.LoanDetails.LoanNo ?? $"LN-{DateTime.Now.Ticks}",
-                            PrincipalAmount = dto.LoanDetails.PrincipalAmount,
-                            InterestRate = dto.LoanDetails.InterestRate ?? 0,
-
-                            StartDate = dto.LoanDetails.StartDate ?? DateTime.UtcNow,
-                            DueDate = dto.LoanDetails.DueDate,
-                            PaidAmount = 0, // Marka la bilaabayo waa 0
-
-                            AccountId = dto.LoanDetails.AccountId,
-                            CustomerId = dto.LoanDetails.CustomerId,
-
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        _context.Loans.Add(loan);
-                    }
-
-                    // TUSAALE: EXPENSE (KHARASH)
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Expense)
-                    {
-                        if (dto.ExpenseDetails == null)
-                            throw new Exception("Xogta Kharashka (Expense) waa lagama maarmaan.");
-
-                        var expense = new Expense
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id, // Link-ga muhiimka ah
-
-                            Title = dto.ExpenseDetails.Title,
-                            Description = dto.ExpenseDetails.Description,
-                            Amount = dto.ExpenseDetails.Amount,
-
-                            AccountId = dto.ExpenseDetails.AccountId, // Expense Account-ka (tusaale: Kirada)
-                            ExpenseDate = dto.ExpenseDetails.ExpenseDate ?? DateTime.UtcNow,
-
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        _context.Expenses.Add(expense);
-                    }
-
-
-                    // TUSAALE: DEPOSIT (LACAG DHIGASHO)
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Deposit)
-                    {
-                        if (dto.DepositDetails == null)
-                            throw new Exception("Xogta Deposit-ka waa lagama maarmaan.");
-
-                        var deposit = new Deposit
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id, // Link-ga Transaction-ka weyn
-
-                            DepositNo = dto.DepositDetails.DepositNo ?? $"DEP-{DateTime.Now.Ticks}",
-                            AccountId = dto.DepositDetails.AccountId,
-                            CustomerId = dto.DepositDetails.CustomerId,
-                            CurrencyId = dto.DepositDetails.CurrencyId,
-
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        _context.Deposits.Add(deposit);
-                    }
-
-
-
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Withdraw)
-                    {
-                        if (dto.WithdrawDetails == null)
-                            throw new Exception("Xogta Withdraw-ga waa lagama maarmaan.");
-
-                        var withdraw = new Withdraw
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id,
-                            WithdrawNo = dto.WithdrawDetails.WithdrawNo ?? $"WD-{DateTime.Now.Ticks}",
-
-                            AccountId = dto.WithdrawDetails.AccountId,
-                            CustomerId = dto.WithdrawDetails.CustomerId,
-                            CurrencyId = dto.WithdrawDetails.CurrencyId,
-
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-
-                            WithdrawnAt = DateTime.UtcNow,
-                            // Haddii aad metadata-da dheeraadka ah rabto:
-                            ReceiverName = dto.WithdrawDetails.ReceiverName,
-                            ReceiverIdCard = dto.WithdrawDetails.ReceiverIdCard
-                        };
-
-                        _context.Withdraws.Add(withdraw);
-                    }
-
-
-                    // REPAYMENT LOGIC
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Repayment)
-                    {
-                        if (dto.RepaymentDetails == null)
-                            throw new Exception("Xogta Repayment-ka waa lagama maarmaan.");
-
-                        var loan = await _context.Loans
-                            .FirstOrDefaultAsync(l => l.Id == dto.RepaymentDetails.LoanId);
-
-                        if (loan == null)
-                            throw new Exception("Deyntan lama helin!");
-
-                        var remainingBalance = loan.PrincipalAmount - loan.PaidAmount;
-                        if (dto.RepaymentDetails.Amount > remainingBalance)
-                        {
-                            throw new Exception($"Lacagta la bixinayo ({dto.RepaymentDetails.Amount}) way ka badantahay baaqiga haray ({remainingBalance})");
-                        }
-
-                        // 1. Update garee lacagta ilaa hadda la bixiyey
-                        loan.PaidAmount += dto.RepaymentDetails.Amount;
-                        loan.UpdatedAt = DateTime.UtcNow;
-
-                        // --- QAYBTA CUSUB: UPDATE STATUS ---
-                        // Haddii lacagta la bixiyey ay la mid tahay ama ka badato deyntii asalka ahayd
-                        if (loan.PaidAmount >= loan.PrincipalAmount)
-                        {
-                            // Halkan geli Status-ka aad u isticmaasho "Paid" ama "Closed"
-                            // Tusaale: 1 = Active, 2 = Paid/Closed
-                            loan.Status = LoanStatusEnum.Closed;
-                        }
-                        // ------------------------------------
-
-                        var payment = new LoanPayment
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id,
-                            LoanId = loan.Id,
-                            Amount = dto.RepaymentDetails.Amount,
-                            PaymentDate = DateTime.UtcNow,
-                            Note = dto.RepaymentDetails.Note,
-                            CashAccountId = dto.RepaymentDetails.CashAccountId,
-                            LoanAccountId = dto.RepaymentDetails.LoanAccountId,
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-                            UserId = _currentUser.UserId
-                        };
-
-                        _context.LoanPayments.Add(payment);
-                    }
-
-
-
-                    // ============================================================
-                    // REVENUE LOGIC (DIRECT) - Haddii uu yahay dakhli toos ah
-                    // ============================================================
-                    if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Revenue)
-                    {
-                        if (dto.RevenueDetails == null)
-                            throw new Exception("Xogta Dakhliga (Revenue) waa lagama maarmaan.");
-
-                        var revenue = new Revenue
-                        {
-                            Id = Guid.NewGuid(),
-                            TransactionId = transaction.Id,
-                            Title = dto.RevenueDetails.Title,
-                            Amount = dto.RevenueDetails.Amount,
-                            RevenueAccountId = dto.RevenueDetails.RevenueAccountId,
-                            CashAccountId = dto.RevenueDetails.CashAccountId,
-                            SourceType = RevenueSourceEnum.Direct,
-                            AgencyId = _currentUser.AgencyId,
-                            BranchId = _currentUser.BranchId,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        _context.Revenues.Add(revenue);
-                    }
-
-              
-
-
-
-                    await _context.SaveChangesAsync();
-                    await dbTransaction.CommitAsync();
-
-                    RemoveByPrefix(TransactionCacheKey);
-                    return transaction.Id;
-                }
-                catch (Exception)
-                {
-                    await dbTransaction.RollbackAsync();
-                    throw;
-                }
-            }, "Transaction-ka waa la diiwaangeliyay", "Cillad ayaa dhacday xilliga diiwaangelinta");
-        }
-        private async Task<string> GenerateReferenceNoAsync()
-        {
-            // Raadi transaction-kii ugu dambeeyay ee maanta dhacay
-            var today = DateTime.UtcNow.Date;
-            var count = await _context.Transactions
-                .CountAsync(t => t.CreatedAt >= today);
-
-            // Qaabka: TRX-20260415-001 (Koodh + Taariikh + Taxane)
-            string datePart = DateTime.UtcNow.ToString("yyyyMMdd");
-            string sequencePart = (count + 1).ToString("D3"); // 001, 002...
-
-            return $"TRX-{datePart}-{sequencePart}";
+            return $"TRX-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6]}";
         }
         // ================================
         // GET ALL TRANSACTIONS
@@ -2040,7 +2907,9 @@ namespace Backend.Services.Accounts
                 cacheKey: $"{AccountCacheKey}_Lookup_Exchange_{_currentUser.UserId}",
                 action: async () =>
                 {
-                    var query = _context.Accounts.AsNoTracking();
+                    var query = _context.Accounts
+                        .AsNoTracking()
+                        .AsQueryable();
 
                     // 🔒 Multi-tenant
                     if (!isAdmin)
@@ -2060,7 +2929,10 @@ namespace Backend.Services.Accounts
                         .Select(x => new AccountLookupDto
                         {
                             Id = x.Id,
-                            Name = x.Name
+                            Name = x.Name,
+
+                            CurrencyId = x.CurrencyId,
+                            CurrencyName = x.Currency.Name
                         })
                         .ToListAsync();
 
@@ -2071,7 +2943,6 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching exchange accounts"
             );
         }
-
 
         public async Task<ResponseWrapper<List<CurrencyLookupDto>>> GetCurrencyLookupAsync()
         {
@@ -2099,6 +2970,70 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching accounts lookup"
             );
         }
+
+
+
+
+        public async Task<ResponseWrapper<int>> CreateExchangeSettingsAsync(CreateExchangeSettingsDto dto)
+        {
+            var exists = await _context.ExchangeSettings
+                .AnyAsync(x => x.CurrencyId == dto.CurrencyId);
+
+            if (exists)
+                return await ResponseWrapper<int>.FailureAsync("Already exists for this currency");
+
+            var entity = new ExchangeSettings
+            {
+                CurrencyId = dto.CurrencyId,
+                FeeRate = dto.FeeRate,
+                ProfitRate = dto.ProfitRate,
+                AgencyId = _currentUser.AgencyId,
+                BranchId = _currentUser.BranchId,
+                UserId =_currentUser.UserId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.ExchangeSettings.Add(entity);
+            await _context.SaveChangesAsync();
+
+            return await ResponseWrapper<int>.SuccessAsync(entity.Id, "Saved successfully");
+        }
+
+
+        public async Task<ResponseWrapper<bool>> UpdateExchangeSettingsAsync(UpdateExchangeSettingsDto dto)
+        {
+            var entity = await _context.ExchangeSettings
+                .FirstOrDefaultAsync(x => x.Id == dto.Id);
+
+            if (entity == null)
+                return await ResponseWrapper<bool>.FailureAsync("Not found");
+
+            entity.FeeRate = dto.FeeRate;
+            entity.ProfitRate = dto.ProfitRate;
+            entity.IsActive = dto.IsActive;
+            entity.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return await ResponseWrapper<bool>.SuccessAsync(true, "Updated successfully");
+        }
+
+
+        public async Task<List<ExchangeSettingsDto>> GetAllExchangeSettingsAsync()
+        {
+            return await _context.ExchangeSettings
+                .Select(x => new ExchangeSettingsDto
+                {
+                    Id = x.Id,
+                    CurrencyId = x.CurrencyId,
+                    FeeRate = x.FeeRate,
+                    ProfitRate = x.ProfitRate,
+                    IsActive = x.IsActive
+                })
+                .ToListAsync();
+        }
+
 
 
 

@@ -2,20 +2,19 @@
 
 namespace Backend.DTOs.Requests.Accounts
 {
-    public class CreateExpenseDto
-    {
-        [Required]
-        [MaxLength(150)]
-        public string Title { get; set; } = string.Empty;
+public class CreateExpenseDto
+{
+    [Required]
+    public string Title { get; set; } = string.Empty;
 
-        public string? Description { get; set; }
+    public string? Description { get; set; }
 
-        [Required]
-        public decimal Amount { get; set; }
+    [Required]
+    public decimal Amount { get; set; }
 
-        [Required]
-        public Guid AccountId { get; set; }   // Expense account
+    [Required]
+    public Guid AccountId { get; set; }
 
-        public DateTime? ExpenseDate { get; set; }
-    }
-}
+    [Required]
+    public Guid CashAccountId { get; set; } // lacagta laga bixinaayo
+}}

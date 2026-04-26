@@ -19,6 +19,7 @@ namespace Backend.Models.Accounts
         public string? WithdrawNo { get; set; } 
 
         public byte Status { get; set; } = 1;
+        public decimal? Amount { get; set; } = 0;
 
         [Required]
         public Guid AccountId { get; set; }

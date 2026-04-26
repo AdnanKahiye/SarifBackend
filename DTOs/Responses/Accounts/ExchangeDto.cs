@@ -21,6 +21,10 @@
         public Guid ToAccountId { get; set; }
         public string? ToAccountName { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int FromCurrencyId { get; set; }
+        public int ToCurrencyId { get; set; }
+        public decimal? NetAmount { get; set; } = 0;
+
 
         public string? UserId { get; set; }
         public string UserName { get; set; } = string.Empty;

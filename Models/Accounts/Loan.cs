@@ -15,7 +15,7 @@ namespace Backend.Models.Accounts
         [Required]
         public decimal PrincipalAmount { get; set; }
 
-        public decimal? InterestRate { get; set; }
+        public decimal InterestRate { get; set; } = 0;
         public decimal PaidAmount { get; set; } = 0;
 
         public DateTime? StartDate { get; set; }
@@ -51,7 +51,7 @@ namespace Backend.Models.Accounts
         public Guid? BranchId { get; set; }
 
         [ForeignKey(nameof(BranchId))]
-        public Branch branchs { get; set; } = null!;
+        public Branch Branch { get; set; } = null!;
 
 
 
@@ -62,7 +62,10 @@ namespace Backend.Models.Accounts
         public Transaction Transaction { get; set; } = null!;
 
 
+        public int CurrencyId { get; set; }
 
+        [ForeignKey(nameof(CurrencyId))]
+        public Currency Currency { get; set; } = null!;
 
     }
 
@@ -70,6 +73,7 @@ namespace Backend.Models.Accounts
     {
         Active = 1,
         Closed = 2,
-        Defaulted = 3
+        Defaulted = 3,
+        Pending = 0
     }
 }

@@ -4,21 +4,16 @@ namespace Backend.DTOs.Requests.Accounts
 {
     public class CreateWithdrawDto
     {
-
-
-        public string? WithdrawNo { get; set; }
-
         [Required]
-        public Guid AccountId { get; set; } // Account-ka macmiilka laga jarayo
+        public Guid AccountId { get; set; }
 
         [Required]
         public Guid CustomerId { get; set; }
 
         [Required]
         public int CurrencyId { get; set; }
-
-        // Metadata dheeraad ah (Optional laakiin muhiim ah)
-        public string? ReceiverName { get; set; }   // Haddii qof kale loo soo wakiishay
-        public string? ReceiverIdCard { get; set; } // Aqoonsiga qofka lacagta qaatay
+        public decimal Amount { get; set; } = 0;
+        public string? ReceiverName { get; set; }
+        public string? ReceiverIdCard { get; set; }
     }
 }

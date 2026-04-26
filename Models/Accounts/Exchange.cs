@@ -20,6 +20,7 @@ namespace Backend.Models.Accounts
 
         public decimal Fee { get; set; } = 0;
         public decimal Profit { get; set; } = 0;
+        public decimal? NetAmount { get; set; } = 0;
 
 
 

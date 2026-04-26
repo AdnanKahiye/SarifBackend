@@ -9,21 +9,14 @@ namespace Backend.DTOs.Requests.Accounts
         [Required]
         public decimal PrincipalAmount { get; set; }
 
-        public decimal? InterestRate { get; set; }
-
-        public DateTime? StartDate { get; set; }
+        public decimal InterestRate { get; set; } = 0;
 
         public DateTime? DueDate { get; set; }
-        public decimal PaidAmount { get; set; } = 0;
 
         [Required]
         public Guid AccountId { get; set; }
 
         [Required]
         public Guid CustomerId { get; set; }
-
-
-        public Guid AgencyId { get; set; }
-        public Guid? BranchId { get; set; }
     }
 }

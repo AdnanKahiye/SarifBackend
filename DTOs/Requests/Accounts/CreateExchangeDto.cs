@@ -5,18 +5,19 @@ namespace Backend.DTOs.Requests.Accounts
     public class CreateExchangeDto
     {
         [Required]
-        public decimal Rate { get; set; }
+        public Guid FromAccountId { get; set; }
 
         [Required]
+        public Guid ToAccountId { get; set; }
+
+        [Required]
+        [Range(0.01, double.MaxValue)]
         public decimal FromAmount { get; set; }
 
         [Required]
-        public decimal ToAmount { get; set; }
+        public int FromCurrencyId { get; set; } =0;
 
-        public decimal Fee { get; set; } = 0;
-
-        public Guid FromAccountId { get; set; }
-
-        public Guid ToAccountId { get; set; }
+        [Required]
+        public int ToCurrencyId { get; set; } = 0;
     }
 }

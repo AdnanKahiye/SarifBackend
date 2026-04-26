@@ -48,6 +48,6 @@ namespace Backend.Models.Accounts
         public Guid? BranchId { get; set; }
 
         [ForeignKey(nameof(BranchId))]
-        public Branch branchs { get; set; } = null!;
+        public Branch Branch { get; set; } = null!;
     }
 }

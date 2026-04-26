@@ -9,7 +9,7 @@ namespace Backend.Models.Accounts
     public class Deposit : BaseEntity
     {
 
-
+        public decimal? Amount { get; set; } = 0;
         public string? DepositNo { get; set; }
 
         public byte Status { get; set; } = 1;

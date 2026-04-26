@@ -1,6 +1,7 @@
 ﻿using Backend.DTOs.Requests.Accounts;
 using Backend.Interfaces.Accounts;
 using Backend.Models.Accounts;
+using Backend.Utiliy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -152,7 +153,7 @@ namespace Backend.Controllers.Accounts
         // ==========================================
 
         [HttpPost("transaction")]
-        public async Task<IActionResult> CreateTransaction([FromBody] CreateTransactionDto dto)
+        public async Task<IActionResult> CreateTransaction([FromBody] CreateTransactionRequest dto)
         {
             var result = await _accountService.CreateTransactionAsync(dto);
             // StatusCode-ka wuxuu ka imaanayaa ResponseWrapper (tusaale: 201 Created)
@@ -306,6 +307,38 @@ namespace Backend.Controllers.Accounts
         public async Task<IActionResult> GetAccountExchangeLookup()
         {
             var result = await _accountService.GetAccountEchangeLookupAsync();
+            return Ok(result);
+        }
+
+
+
+        // ==============================
+        // ✅ CREATE
+        // ==============================
+        [HttpPost("exchange-settings")]
+        public async Task<IActionResult> Create([FromBody] CreateExchangeSettingsDto dto)
+        {
+            var result = await _accountService.CreateExchangeSettingsAsync(dto);
+            return Ok(result);
+        }
+
+        // ==============================
+        // ✅ UPDATE
+        // ==============================
+        [HttpPut("exchange-settings")]
+        public async Task<IActionResult> Update([FromBody] UpdateExchangeSettingsDto dto)
+        {
+            var result = await _accountService.UpdateExchangeSettingsAsync(dto);
+            return Ok(result);
+        }
+
+        // ==============================
+        // ✅ GET ALL
+        // ==============================
+        [HttpGet("exchange-settings")]
+        public async Task<IActionResult> GetAll()
+        {
+            var result = await _accountService.GetAllExchangeSettingsAsync();
             return Ok(result);
         }
     }

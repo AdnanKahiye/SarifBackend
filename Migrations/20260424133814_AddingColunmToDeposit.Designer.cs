@@ -3,6 +3,7 @@ using System;
 using Backend.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424133814_AddingColunmToDeposit")]
+    partial class AddingColunmToDeposit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -570,16 +573,13 @@ namespace Backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("CurrencyId")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal>("InterestRate")
+                    b.Property<decimal?>("InterestRate")
                         .HasColumnType("numeric");
 
                     b.Property<bool>("IsActive")
@@ -623,8 +623,6 @@ namespace Backend.Migrations
                     b.HasIndex("AgencyId");
 
                     b.HasIndex("BranchId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("CustomerId");
 
@@ -987,9 +985,6 @@ namespace Backend.Migrations
 
                     b.Property<Guid>("AgencyId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal?>("Amount")
-                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("BranchId")
                         .HasColumnType("uuid");
@@ -2347,15 +2342,9 @@ namespace Backend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Backend.Models.Setup.Branch", "Branch")
+                    b.HasOne("Backend.Models.Setup.Branch", "branchs")
                         .WithMany()
                         .HasForeignKey("BranchId");
-
-                    b.HasOne("Backend.Models.Accounts.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.HasOne("Backend.Models.Customers.Customer", "Customer")
                         .WithMany()
@@ -2381,10 +2370,6 @@ namespace Backend.Migrations
 
                     b.Navigation("Agency");
 
-                    b.Navigation("Branch");
-
-                    b.Navigation("Currency");
-
                     b.Navigation("Customer");
 
                     b.Navigation("Transaction");
@@ -2392,6 +2377,8 @@ namespace Backend.Migrations
                     b.Navigation("UpdatedUser");
 
                     b.Navigation("User");
+
+                    b.Navigation("branchs");
                 });
 
             modelBuilder.Entity("Backend.Models.Accounts.LoanPayment", b =>

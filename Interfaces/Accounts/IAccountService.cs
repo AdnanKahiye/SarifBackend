@@ -68,7 +68,10 @@ namespace Backend.Interfaces.Accounts
         /// </summary>
         /// <param name="dto"></param>
         /// <returns></returns>
-        Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionDto dto);
+        Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionRequest request);
+        Task<ResponseWrapper<int>> CreateExchangeSettingsAsync(CreateExchangeSettingsDto dto);
+        Task<ResponseWrapper<bool>> UpdateExchangeSettingsAsync(UpdateExchangeSettingsDto dto);
+        Task<List<ExchangeSettingsDto>> GetAllExchangeSettingsAsync();
 
         Task<ResponseWrapper<PagedResponse<TransactionDto>>> GetAllTransactionsAsync(int page = 1, int pageSize = 10);
         Task<ResponseWrapper<bool>> UpdateTransactionAsync(Guid id, UpdateTransactionDto dto);

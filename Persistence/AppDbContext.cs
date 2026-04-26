@@ -45,6 +45,7 @@ namespace Backend.Persistence
         public DbSet<Withdraw>  Withdraws { get; set; }
         public DbSet<LoanPayment> LoanPayments { get; set; }
         public DbSet<Revenue>  Revenues { get; set; }
+        public DbSet<ExchangeSettings>   ExchangeSettings { get; set; }
 
 
 
@@ -124,6 +125,10 @@ namespace Backend.Persistence
                 .WithMany(b => b.Users)
                 .HasForeignKey(u => u.BranchId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+             modelBuilder.Entity<ExchangeSettings>()
+            .HasIndex(x => x.CurrencyId)
+            .IsUnique();
 
 
 
