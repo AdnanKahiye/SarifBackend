@@ -202,54 +202,81 @@ namespace Backend.Controllers.Accounts
 
 
         [HttpGet("transfers")]
-        public async Task<IActionResult> GetTransfers([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetTransfers(
+         [FromQuery] int page = 1,
+         [FromQuery] int pageSize = 10,
+         [FromQuery] DateTime? fromDate = null,
+         [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllTransfersAsync(page, pageSize);
+            var result = await _accountService.GetAllTransfersAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
 
         [HttpGet("loans")]
-        public async Task<IActionResult> GetLoans([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetLoans(
+     [FromQuery] int page = 1,
+     [FromQuery] int pageSize = 10,
+     [FromQuery] DateTime? fromDate = null,
+     [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllLoanAsync(page, pageSize);
+            var result = await _accountService.GetAllLoanAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
         [HttpGet("expenses")]
-        public async Task<IActionResult> GetExpenses([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetExpenses(
+     [FromQuery] int page = 1,
+     [FromQuery] int pageSize = 10,
+     [FromQuery] DateTime? fromDate = null,
+     [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllExpensesAsync(page, pageSize);
+            var result = await _accountService.GetAllExpensesAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
-
         [HttpGet("deposits")]
-        public async Task<IActionResult> GetDeposits([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetDeposits(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] DateTime? fromDate = null,
+            [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllDepositsAsync(page, pageSize);
+            var result = await _accountService.GetAllDepositsAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
 
         [HttpGet("withdrawals")]
-        public async Task<IActionResult> GetWithdrawals([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetWithdrawals(
+       [FromQuery] int page = 1,
+       [FromQuery] int pageSize = 10,
+       [FromQuery] DateTime? fromDate = null,
+       [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllWithdrawAsync(page, pageSize);
+            var result = await _accountService.GetAllWithdrawAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
         [HttpGet("loanPayment")]
-        public async Task<IActionResult> GetLoanPayment([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetLoanPayment(
+       [FromQuery] int page = 1,
+       [FromQuery] int pageSize = 10,
+       [FromQuery] DateTime? fromDate = null,
+       [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllLoanPaymentAsync(page, pageSize);
+            var result = await _accountService.GetAllLoanPaymentAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
         [HttpGet("revinues")]
-        public async Task<IActionResult> GetAllRevinues([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetAllRevinues(
+     [FromQuery] int page = 1,
+     [FromQuery] int pageSize = 10,
+     [FromQuery] DateTime? fromDate = null,
+     [FromQuery] DateTime? toDate = null)
         {
-            var result = await _accountService.GetAllRevinuesAsync(page, pageSize);
+            var result = await _accountService.GetAllRevinuesAsync(page, pageSize, fromDate, toDate);
             return Ok(result);
         }
 
@@ -307,6 +334,13 @@ namespace Backend.Controllers.Accounts
         public async Task<IActionResult> GetAccountExchangeLookup()
         {
             var result = await _accountService.GetAccountEchangeLookupAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("account-expenses-lookup")]
+        public async Task<IActionResult> GetAccountExpensesLookup()
+        {
+            var result = await _accountService.GetAccountExpenseLookupAsync();
             return Ok(result);
         }
 

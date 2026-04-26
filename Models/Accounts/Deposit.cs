@@ -53,4 +53,7 @@ namespace Backend.Models.Accounts
         [ForeignKey(nameof(BranchId))]
         public Branch? Branch { get; set; }
     }
+
+
+
 }

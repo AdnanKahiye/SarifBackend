@@ -793,6 +793,7 @@ namespace Backend.Services.Accounts
                     AccountId = dto.AccountId,
                     CustomerId = dto.CustomerId,
                     Amount = dto.Amount,
+                    WithdrawNo = GenerateReferenceNo(),
                     CurrencyId = currencyId,
                     ReceiverName = dto.ReceiverName,
                     ReceiverIdCard = dto.ReceiverIdCard,
@@ -877,8 +878,10 @@ namespace Backend.Services.Accounts
                     PrincipalAmount = dto.PrincipalAmount,
                     InterestRate = dto.InterestRate,
                     StartDate = DateTime.UtcNow,
-                    DueDate = dto.DueDate,
-                    LoanNo=referenceNo,
+                    DueDate = dto.DueDate == null
+                            ? null
+                            : DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc),
+                    LoanNo =referenceNo,
                     PaidAmount = 0,
                     CurrencyId = currencyId,
                     AgencyId = _currentUser.AgencyId,
@@ -2246,29 +2249,55 @@ namespace Backend.Services.Accounts
 
 
 
-        public async Task<ResponseWrapper<PagedResponse<TransferDto>>> GetAllTransfersAsync(int page = 1, int pageSize = 10)
+        public async Task<ResponseWrapper<PagedResponse<TransferDto>>> GetAllTransfersAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_T_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Transfers
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2277,7 +2306,6 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<TransferDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
@@ -2289,31 +2317,55 @@ namespace Backend.Services.Accounts
             );
         }
 
-
-
-        public async Task<ResponseWrapper<PagedResponse<LoanDto>>> GetAllLoanAsync(int page = 1, int pageSize = 10)
+        public async Task<ResponseWrapper<PagedResponse<LoanDto>>> GetAllLoanAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_L_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Loans
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2322,42 +2374,65 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<LoanDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
                     return new PagedResponse<LoanDto>(mapped, page, pageSize, totalRecords);
                 },
-                successMessageFactory: result => $"{result.Data.Count} Loan fetched",
-                cacheMessage: "Loan loaded from cache",
-                errorMessage: "Error fetching loan"
+                successMessageFactory: result => $"{result.Data.Count} Loans fetched",
+                cacheMessage: "Loans loaded from cache",
+                errorMessage: "Error fetching loans"
             );
         }
-
-
-        public async Task<ResponseWrapper<PagedResponse<ExpenseDto>>> GetAllExpensesAsync(int page = 1, int pageSize = 10)
+        public async Task<ResponseWrapper<PagedResponse<ExpenseDto>>> GetAllExpensesAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_E_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Expenses
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2366,44 +2441,67 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<ExpenseDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
                     return new PagedResponse<ExpenseDto>(mapped, page, pageSize, totalRecords);
                 },
-                successMessageFactory: result => $"{result.Data.Count} Expepses fetched",
-                cacheMessage: "Expepses loaded from cache",
-                errorMessage: "Error fetching expepses"
+                successMessageFactory: result => $"{result.Data.Count} Expenses fetched",
+                cacheMessage: "Expenses loaded from cache",
+                errorMessage: "Error fetching expenses"
             );
         }
 
 
-
-        public async Task<ResponseWrapper<PagedResponse<DepositDto>>> GetAllDepositsAsync(int page = 1, int pageSize = 10)
-
+        public async Task<ResponseWrapper<PagedResponse<DepositDto>>> GetAllDepositsAsync(
+      int page = 1,
+      int pageSize = 10,
+      DateTime? fromDate = null,
+      DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Deposits
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. FIX: Convert DateTime to UTC BEFORE using in query
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2412,7 +2510,6 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<DepositDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
@@ -2425,32 +2522,55 @@ namespace Backend.Services.Accounts
         }
 
 
-
-
-        public async Task<ResponseWrapper<PagedResponse<WithdrawalDto>>> GetAllWithdrawAsync(int page = 1, int pageSize = 10)
-
+        public async Task<ResponseWrapper<PagedResponse<WithdrawalDto>>> GetAllWithdrawAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_W_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Withdraws
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2459,7 +2579,6 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<WithdrawalDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
@@ -2473,31 +2592,55 @@ namespace Backend.Services.Accounts
 
 
 
-
-        public async Task<ResponseWrapper<PagedResponse<LoanPaymentDto>>> GetAllLoanPaymentAsync(int page = 1, int pageSize = 10)
-
+        public async Task<ResponseWrapper<PagedResponse<LoanPaymentDto>>> GetAllLoanPaymentAsync(
+            int page = 1,
+            int pageSize = 10,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_LP_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.LoanPayments
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2506,7 +2649,6 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<LoanPaymentDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
@@ -2519,31 +2661,55 @@ namespace Backend.Services.Accounts
         }
 
 
-
-        public async Task<ResponseWrapper<PagedResponse<RevenueDto>>> GetAllRevinuesAsync(int page = 1, int pageSize = 10)
-
+        public async Task<ResponseWrapper<PagedResponse<RevenueDto>>> GetAllRevinuesAsync(
+     int page = 1,
+     int pageSize = 10,
+     DateTime? fromDate = null,
+     DateTime? toDate = null)
         {
             // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check (Consistency with other services)
+            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_P{page}_PS{pageSize}",
+                // ✅ include filters in cache key
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_R_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
-                    // Note: Removed .Include() because .ProjectTo() handles it via AutoMapper
                     var query = _context.Revenues
-                        .AsNoTracking();
+                        .AsNoTracking()
+                        .AsQueryable();
 
-                    // 3. Multi-tenant filter logic
+                    // 3. Multi-tenant filter
                     if (!isAdmin)
                     {
                         query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // ✅ 4. Date Filters with UTC FIX
+                    if (fromDate.HasValue)
+                    {
+                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
+                            ? fromDate.Value
+                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                    }
+
+                    if (toDate.HasValue)
+                    {
+                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+
+                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
+                            ? endOfDay
+                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+
+                        query = query.Where(x => x.CreatedAt <= toUtc);
                     }
 
                     var totalRecords = await query.CountAsync();
@@ -2552,7 +2718,6 @@ namespace Backend.Services.Accounts
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        // ProjectTo creates the most efficient SQL query automatically
                         .ProjectTo<RevenueDto>(_mapper.ConfigurationProvider)
                         .ToListAsync();
 
@@ -2563,8 +2728,6 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching revenue"
             );
         }
-
-
 
         public async Task<ResponseWrapper<ProfitLossDto>> GetProfitLossAsync(
      DateTime? fromDate = null,
@@ -2893,6 +3056,53 @@ namespace Backend.Services.Accounts
                 successMessageFactory: result => $"{result.Count} accounts fetched",
                 cacheMessage: "Accounts lookup loaded from cache",
                 errorMessage: "Error fetching accounts lookup"
+            );
+        }
+
+
+
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountExpenseLookupAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{AccountCacheKey}_Lookup_Expenses_{_currentUser.UserId}",
+                action: async () =>
+                {
+                    var query = _context.Accounts
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    // 🔒 Multi-tenant
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // 🔥 FILTER: ONLY exchange accounts
+                    query = query.Where(x =>
+                        x.AccountType == AccountTypeEnum.Expense
+                        
+                    );
+
+                    var data = await query
+                        .OrderBy(x => x.Name)
+                        .Select(x => new AccountLookupDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name,
+
+                            CurrencyId = x.CurrencyId,
+                            CurrencyName = x.Currency.Name
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} exchange accounts fetched",
+                cacheMessage: "Exchange accounts loaded from cache",
+                errorMessage: "Error fetching exchange accounts"
             );
         }
 

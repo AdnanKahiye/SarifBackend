@@ -24,6 +24,8 @@
 
         public Guid? ToBranchId { get; set; }
         public string? ToBranchName { get; set; }
+        public DateTime CreatedAt { get; set; }
+
 
 
         public string? UserId { get; set; }
