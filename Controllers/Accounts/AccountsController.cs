@@ -336,6 +336,12 @@ namespace Backend.Controllers.Accounts
             var result = await _accountService.GetAccountEchangeLookupAsync();
             return Ok(result);
         }
+        [HttpGet("account-revenue-lookup")]
+        public async Task<IActionResult> GetAccountRevenuesLookup()
+        {
+            var result = await _accountService.GetAccountRevenuesLookupAsync();
+            return Ok(result);
+        }
 
         [HttpGet("account-expenses-lookup")]
         public async Task<IActionResult> GetAccountExpensesLookup()

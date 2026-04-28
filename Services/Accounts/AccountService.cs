@@ -1305,476 +1305,6 @@ namespace Backend.Services.Accounts
 
 
 
-
-
-
-        // ================================
-        // CREATE TRANSACTION
-        // ================================
-        //    public async Task<ResponseWrapper<Guid>> CreateTransactionAsync(CreateTransactionDto dto)
-        //    {
-        //        // 0. Hubi Aqoonsiga User-ka
-        //        if (string.IsNullOrEmpty(_currentUser.UserId))
-        //            return await ResponseWrapper<Guid>.FailureAsync("Unauthorized", "User not authenticated", 401);
-
-        //        // 1. Hubi Currencies-ka iyo Nooca Transaction-ka
-        //        var distinctCurrencies = dto.Details.Select(d => d.CurrencyId).Distinct().ToList();
-        //        bool isMultiCurrency = distinctCurrencies.Count > 1;
-
-        //        // 2. Business Logic Validation (Xeerarka Noocyada)
-        //        switch ((TransactionTypeEnum)dto.TransactionType)
-        //        {
-        //            case TransactionTypeEnum.Deposit:
-        //            case TransactionTypeEnum.Withdraw:
-        //            case TransactionTypeEnum.Transfer:
-        //                if (isMultiCurrency)
-        //                    return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Noocan transaction-ka ah ma oggola laba lacag oo kala duwan.");
-        //                break;
-
-        //            case TransactionTypeEnum.Exchange:
-        //                if (!isMultiCurrency)
-        //                    return await ResponseWrapper<Guid>.FailureAsync("Validation Error", "Sarifka (Exchange) waa inuu ka koobnaadaa ugu yaraan laba lacag oo kala duwan.");
-        //                break;
-
-        //            default:
-        //                // Noocyada kale sida Loan/Expense waxay u baahan karaan validation u gaar ah mustaqbalka
-        //                break;
-        //        }
-
-        //        // 3. HEL EXCHANGE RATES (Kaliya haddii ay lagama maarmaan tahay)
-        //        Dictionary<int, decimal> rates = new();
-        //        if (isMultiCurrency)
-        //        {
-        //                        rates = await _context.ExchangeRates
-        //            .Where(r => distinctCurrencies.Contains(r.CurrencyId))
-        //            .GroupBy(r => r.CurrencyId)
-        //            .ToDictionaryAsync(
-        //                g => g.Key,
-        //                g => g.OrderByDescending(x => x.CreatedAt).First().Rate
-        //);
-        //        }
-
-        //        // 4. DOUBLE-ENTRY VALIDATION
-        //        decimal totalDebitBase = 0;
-        //        decimal totalCreditBase = 0;
-
-        //        foreach (var d in dto.Details)
-        //        {
-        //            decimal amountInBase;
-
-        //            if (isMultiCurrency)
-        //            {
-        //                if (!rates.TryGetValue(d.CurrencyId, out decimal rate) || rate <= 0)
-        //                    return await ResponseWrapper<Guid>.FailureAsync("Rate Error", $"Exchange rate-ka lama helin Currency ID: {d.CurrencyId}");
-
-        //                amountInBase = d.Amount / rate;
-        //            }
-        //            else
-        //            {
-        //                amountInBase = d.Amount;
-        //            }
-
-        //            if (d.EntryType == 1) totalDebitBase += amountInBase; // 1 = Debit
-        //            else if (d.EntryType == 2) totalCreditBase += amountInBase; // 2 = Credit
-        //        }
-
-        //        // 5. Isbarbardhig (Balance Check)
-        //        decimal diff = Math.Abs(totalDebitBase - totalCreditBase);
-        //        decimal allowedTolerance = isMultiCurrency ? 0.01m : 0m;
-
-        //        if (diff > allowedTolerance)
-        //        {
-        //            return await ResponseWrapper<Guid>.FailureAsync("Validation Error",
-        //                $"Transaction-ku ma dheelli tirna (Out of balance). Difference: {diff:N2}");
-        //        }
-
-        //        // 6. DIIWAANGELINTA (DATABASE WRITE)
-        //        return await ExecuteWriteAsync(async () =>
-        //        {
-        //            using var dbTransaction = await _context.Database.BeginTransactionAsync();
-        //            try
-        //            {
-        //                var transaction = _mapper.Map<Transaction>(dto);
-        //                transaction.ReferenceNo = await GenerateReferenceNoAsync();
-        //                transaction.Id = Guid.NewGuid();
-        //                transaction.UserId = _currentUser.UserId;
-        //                transaction.AgencyId = _currentUser.AgencyId;
-        //                transaction.BranchId = _currentUser.BranchId;
-        //                transaction.CreatedAt = DateTime.UtcNow;
-        //                transaction.TotalAmount = totalDebitBase; // USD Base Value
-
-        //                foreach (var detail in transaction.Details)
-        //                {
-        //                    detail.Id = Guid.NewGuid();
-        //                    detail.TransactionId = transaction.Id;
-        //                    detail.UserId = _currentUser.UserId;
-        //                    detail.TransactionType = transaction.TransactionType;
-        //                    detail.CreatedAt = DateTime.UtcNow;
-        //                    // detail.AgencyId = _currentUser.AgencyId; // Haddii aad ku haysato Detail Table-ka
-        //                }
-
-        //                _context.Transactions.Add(transaction);
-
-
-
-
-        //                // ============================================================
-        //                // TUSAALE: KAYDINTA METADATA-DA (EXCHANGE)
-        //                // ============================================================
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Exchange)
-        //                {
-
-        //                    var toDetails = dto.Details.FirstOrDefault(d => d.EntryType == 1);
-
-        //                    if (toDetails == null)
-        //                        throw new Exception("Destination account lama helin");
-
-        //                    if (!rates.TryGetValue(toDetails.CurrencyId, out decimal rate))
-        //                        throw new Exception("Exchange rate lama helin");
-
-        //                    var exchange = new Exchange
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id,
-        //                        Rate = rate,
-        //                        Fee = dto.Fee ?? 0,
-        //                        Profit = dto.Profit ?? 0,
-
-        //                        // Helitaanka Account-yada (From/To)
-        //                        // EntryType 1 = Debit (Gashay), 2 = Credit (Baxday)
-        //                        FromAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.AccountId ?? Guid.Empty,
-        //                        ToAccountId = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.AccountId ?? Guid.Empty,
-
-        //                        FromAmount = dto.Details.FirstOrDefault(d => d.EntryType == 2)?.Amount ?? 0,
-        //                        ToAmount = dto.Details.FirstOrDefault(d => d.EntryType == 1)?.Amount ?? 0,
-
-        //                        // Metadata-da kale
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        UpdatedAt = DateTime.UtcNow,
-        //                        BranchId = _currentUser.BranchId,
-        //                        AgencyId = _currentUser.AgencyId
-
-        //                    };
-
-        //                    decimal totalRevenue = (dto.Profit ?? 0) + (dto.Fee ?? 0);
-
-        //                    if (totalRevenue > 0)
-
-        //                    {
-
-        //                        var toDetail = dto.Details.FirstOrDefault(d => d.EntryType == 1);
-
-        //                        if (toDetail == null)
-        //                            throw new Exception("Destination account lama helin");
-
-        //                        var currencyId = toDetail.CurrencyId;
-
-        //                        // 🔥 Hel Revenue Account
-        //                        var revenueAccount = await _context.Accounts
-        //                            .FirstOrDefaultAsync(a =>
-        //                                a.AccountType == AccountTypeEnum.Revenue &&
-        //                                a.CurrencyId == currencyId &&
-        //                                a.Name.Contains("Exchange Profit"));
-
-        //                        // ❗ HUBI HALKAN KA HOR ISTICMAAL
-        //                        if (revenueAccount == null)
-        //                            throw new Exception($"Exchange Profit account lama helin currencyId: {currencyId}");
-
-
-        //                        // 👉 Debit (Cash)
-        //                        // 👉 Debit (Cash)
-        //                        _context.TransactionDetails.Add(new TransactionDetail
-        //                        {
-        //                            Id = Guid.NewGuid(),
-        //                            TransactionId = transaction.Id,
-        //                            AccountId = toDetail.AccountId,
-        //                            CurrencyId = toDetail.CurrencyId, // ✅ ADD THIS
-        //                            Amount = totalRevenue,
-        //                            EntryType = 1,
-        //                            UserId = _currentUser.UserId,
-        //                            TransactionType = transaction.TransactionType,
-        //                            CreatedAt = DateTime.UtcNow
-        //                        });
-
-        //                        // 👉 Credit (Revenue)
-        //                        _context.TransactionDetails.Add(new TransactionDetail
-        //                        {
-        //                            Id = Guid.NewGuid(),
-        //                            TransactionId = transaction.Id,
-        //                            AccountId = revenueAccount.Id,
-        //                            CurrencyId = currencyId, // ✅ ADD THIS
-        //                            Amount = totalRevenue,
-        //                            EntryType = 2,
-        //                            UserId = _currentUser.UserId,
-        //                            TransactionType = transaction.TransactionType,
-        //                            CreatedAt = DateTime.UtcNow
-        //                        });
-
-        //                        // 👉 Save Revenue table
-        //                        var autoRevenue = new Revenue
-        //                        {
-        //                            Id = Guid.NewGuid(),
-        //                            TransactionId = transaction.Id,
-        //                            Title = $"Exchange Profit/Fee - Ref: {transaction.ReferenceNo}",
-        //                            Amount = totalRevenue,
-        //                            RevenueAccountId = revenueAccount.Id,
-        //                            CashAccountId = toDetail.AccountId,
-        //                            SourceType = RevenueSourceEnum.Exchange,
-        //                            AgencyId = _currentUser.AgencyId,
-        //                            CreatedAt = DateTime.UtcNow
-        //                        };
-
-        //                        _context.Revenues.Add(autoRevenue);
-        //                    }
-
-
-
-        //                    _context.Exchanges.Add(exchange);
-        //                }
-
-        //                // TUSAALE KALE: TRANSFER
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Transfer)
-        //                {
-        //                    if (dto.TransferDetails == null)
-        //                    {
-        //                        // Hubi in xogta Transfer-ka la soo diray
-        //                        throw new Exception("Xogta Transfer-ka waa lagama maarmaan.");
-        //                    }
-
-        //                    var transfer = new Transfer
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id, // Ku xir Transaction-ka weyn
-
-        //                        // Xogta laga soo minguuriyay TransferDetails DTO
-        //                        SenderName = dto.TransferDetails.SenderName,
-        //                        ReceiverName = dto.TransferDetails.ReceiverName,
-        //                        FromAccountId = dto.TransferDetails.FromAccountId,
-        //                        ToAccountId = dto.TransferDetails.ToAccountId,
-        //                        Amount = dto.TransferDetails.Amount,
-
-        //                        // Laamaha (Branches)
-        //                        FromBranchId = _currentUser.BranchId,
-        //                        ToBranchId = _currentUser.BranchId,
-        //                        AgencyId =_currentUser.AgencyId,
-
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        UpdatedAt = DateTime.UtcNow
-        //                    };
-
-        //                    _context.Transfers.Add(transfer);
-        //                }
-
-
-        //                // TUSAALE: LOAN (DAYN)
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Loan)
-        //                {
-        //                    if (dto.LoanDetails == null)
-        //                        throw new Exception("Xogta Loan-ka waa lagama maarmaan.");
-
-        //                    var loan = new Loan
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id, // Ku xir xawaaladda/transaction-ka
-
-        //                        LoanNo = dto.LoanDetails.LoanNo ?? $"LN-{DateTime.Now.Ticks}",
-        //                        PrincipalAmount = dto.LoanDetails.PrincipalAmount,
-        //                        InterestRate = dto.LoanDetails.InterestRate ?? 0,
-
-        //                        StartDate = dto.LoanDetails.StartDate ?? DateTime.UtcNow,
-        //                        DueDate = dto.LoanDetails.DueDate,
-        //                        PaidAmount = 0, // Marka la bilaabayo waa 0
-
-        //                        AccountId = dto.LoanDetails.AccountId,
-        //                        CustomerId = dto.LoanDetails.CustomerId,
-
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        UpdatedAt = DateTime.UtcNow
-        //                    };
-
-        //                    _context.Loans.Add(loan);
-        //                }
-
-        //                // TUSAALE: EXPENSE (KHARASH)
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Expense)
-        //                {
-        //                    if (dto.ExpenseDetails == null)
-        //                        throw new Exception("Xogta Kharashka (Expense) waa lagama maarmaan.");
-
-        //                    var expense = new Expense
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id, // Link-ga muhiimka ah
-
-        //                        Title = dto.ExpenseDetails.Title,
-        //                        Description = dto.ExpenseDetails.Description,
-        //                        Amount = dto.ExpenseDetails.Amount,
-
-        //                        AccountId = dto.ExpenseDetails.AccountId, // Expense Account-ka (tusaale: Kirada)
-        //                        ExpenseDate = dto.ExpenseDetails.ExpenseDate ?? DateTime.UtcNow,
-
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        UpdatedAt = DateTime.UtcNow
-        //                    };
-
-        //                    _context.Expenses.Add(expense);
-        //                }
-
-
-        //                // TUSAALE: DEPOSIT (LACAG DHIGASHO)
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Deposit)
-        //                {
-        //                    if (dto.DepositDetails == null)
-        //                        throw new Exception("Xogta Deposit-ka waa lagama maarmaan.");
-
-        //                    var deposit = new Deposit
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id, // Link-ga Transaction-ka weyn
-
-        //                        DepositNo = dto.DepositDetails.DepositNo ?? $"DEP-{DateTime.Now.Ticks}",
-        //                        AccountId = dto.DepositDetails.AccountId,
-        //                        CustomerId = dto.DepositDetails.CustomerId,
-        //                        CurrencyId = dto.DepositDetails.CurrencyId,
-
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        UpdatedAt = DateTime.UtcNow
-        //                    };
-
-        //                    _context.Deposits.Add(deposit);
-        //                }
-
-
-
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Withdraw)
-        //                {
-        //                    if (dto.WithdrawDetails == null)
-        //                        throw new Exception("Xogta Withdraw-ga waa lagama maarmaan.");
-
-        //                    var withdraw = new Withdraw
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id,
-        //                        WithdrawNo = dto.WithdrawDetails.WithdrawNo ?? $"WD-{DateTime.Now.Ticks}",
-
-        //                        AccountId = dto.WithdrawDetails.AccountId,
-        //                        CustomerId = dto.WithdrawDetails.CustomerId,
-        //                        CurrencyId = dto.WithdrawDetails.CurrencyId,
-
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-
-        //                        WithdrawnAt = DateTime.UtcNow,
-        //                        // Haddii aad metadata-da dheeraadka ah rabto:
-        //                        ReceiverName = dto.WithdrawDetails.ReceiverName,
-        //                        ReceiverIdCard = dto.WithdrawDetails.ReceiverIdCard
-        //                    };
-
-        //                    _context.Withdraws.Add(withdraw);
-        //                }
-
-
-        //                // REPAYMENT LOGIC
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Repayment)
-        //                {
-        //                    if (dto.RepaymentDetails == null)
-        //                        throw new Exception("Xogta Repayment-ka waa lagama maarmaan.");
-
-        //                    var loan = await _context.Loans
-        //                        .FirstOrDefaultAsync(l => l.Id == dto.RepaymentDetails.LoanId);
-
-        //                    if (loan == null)
-        //                        throw new Exception("Deyntan lama helin!");
-
-        //                    var remainingBalance = loan.PrincipalAmount - loan.PaidAmount;
-        //                    if (dto.RepaymentDetails.Amount > remainingBalance)
-        //                    {
-        //                        throw new Exception($"Lacagta la bixinayo ({dto.RepaymentDetails.Amount}) way ka badantahay baaqiga haray ({remainingBalance})");
-        //                    }
-
-        //                    // 1. Update garee lacagta ilaa hadda la bixiyey
-        //                    loan.PaidAmount += dto.RepaymentDetails.Amount;
-        //                    loan.UpdatedAt = DateTime.UtcNow;
-
-        //                    // --- QAYBTA CUSUB: UPDATE STATUS ---
-        //                    // Haddii lacagta la bixiyey ay la mid tahay ama ka badato deyntii asalka ahayd
-        //                    if (loan.PaidAmount >= loan.PrincipalAmount)
-        //                    {
-        //                        // Halkan geli Status-ka aad u isticmaasho "Paid" ama "Closed"
-        //                        // Tusaale: 1 = Active, 2 = Paid/Closed
-        //                        loan.Status = LoanStatusEnum.Closed;
-        //                    }
-        //                    // ------------------------------------
-
-        //                    var payment = new LoanPayment
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id,
-        //                        LoanId = loan.Id,
-        //                        Amount = dto.RepaymentDetails.Amount,
-        //                        PaymentDate = DateTime.UtcNow,
-        //                        Note = dto.RepaymentDetails.Note,
-        //                        CashAccountId = dto.RepaymentDetails.CashAccountId,
-        //                        LoanAccountId = dto.RepaymentDetails.LoanAccountId,
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-        //                        UserId = _currentUser.UserId
-        //                    };
-
-        //                    _context.LoanPayments.Add(payment);
-        //                }
-
-
-
-        //                // ============================================================
-        //                // REVENUE LOGIC (DIRECT) - Haddii uu yahay dakhli toos ah
-        //                // ============================================================
-        //                if ((TransactionTypeEnum)dto.TransactionType == TransactionTypeEnum.Revenue)
-        //                {
-        //                    if (dto.RevenueDetails == null)
-        //                        throw new Exception("Xogta Dakhliga (Revenue) waa lagama maarmaan.");
-
-        //                    var revenue = new Revenue
-        //                    {
-        //                        Id = Guid.NewGuid(),
-        //                        TransactionId = transaction.Id,
-        //                        Title = dto.RevenueDetails.Title,
-        //                        Amount = dto.RevenueDetails.Amount,
-        //                        RevenueAccountId = dto.RevenueDetails.RevenueAccountId,
-        //                        CashAccountId = dto.RevenueDetails.CashAccountId,
-        //                        SourceType = RevenueSourceEnum.Direct,
-        //                        AgencyId = _currentUser.AgencyId,
-        //                        BranchId = _currentUser.BranchId,
-        //                        CreatedAt = DateTime.UtcNow
-        //                    };
-        //                    _context.Revenues.Add(revenue);
-        //                }
-
-
-
-
-
-        //                await _context.SaveChangesAsync();
-        //                await dbTransaction.CommitAsync();
-
-        //                RemoveByPrefix(TransactionCacheKey);
-        //                return transaction.Id;
-        //            }
-        //            catch (Exception)
-        //            {
-        //                await dbTransaction.RollbackAsync();
-        //                throw;
-        //            }
-        //        }, "Transaction-ka waa la diiwaangeliyay", "Cillad ayaa dhacday xilliga diiwaangelinta");
-        //    }
         private string GenerateReferenceNo()
         {
             return $"TRX-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6]}";
@@ -3153,6 +2683,58 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching exchange accounts"
             );
         }
+
+
+
+
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountRevenuesLookupAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{AccountCacheKey}_Lookup_Revenues_{_currentUser.UserId}",
+                action: async () =>
+                {
+                    var query = _context.Accounts
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    // 🔒 Multi-tenant
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    // 🔥 FILTER: ONLY exchange accounts
+                    query = query.Where(x =>
+                        x.AccountType == AccountTypeEnum.Revenue
+
+                    );
+
+                    var data = await query
+                        .OrderBy(x => x.Name)
+                        .Select(x => new AccountLookupDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name,
+
+                            CurrencyId = x.CurrencyId,
+                            CurrencyName = x.Currency.Name
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} exchange accounts fetched",
+                cacheMessage: "Exchange accounts loaded from cache",
+                errorMessage: "Error fetching exchange accounts"
+            );
+        }
+
+
+
+
 
         public async Task<ResponseWrapper<List<CurrencyLookupDto>>> GetCurrencyLookupAsync()
         {

@@ -115,6 +115,7 @@ int pageSize = 10);
         Task<ResponseWrapper<List<CurrencyLookupDto>>> GetCurrencyLookupAsync();
         Task<ResponseWrapper<bool>> DeleteTransactionAsync(Guid id);
         Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountEchangeLookupAsync();
+        Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountRevenuesLookupAsync();
         Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountExpenseLookupAsync();
 
         Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(
