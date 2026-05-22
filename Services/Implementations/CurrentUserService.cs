@@ -38,12 +38,19 @@ namespace Backend.Services.Implementations
         }
 
 
-        public Guid AgencyId =>
-    Guid.Parse(
-        _httpContextAccessor.HttpContext?.User?
-            .FindFirst("AgencyId")?.Value
-        ?? Guid.Empty.ToString()
-    );
+        public Guid AgencyId
+        {
+            get
+            {
+                var value = _httpContextAccessor.HttpContext?.User?
+                    .FindFirst("AgencyId")?.Value;
+
+                if (Guid.TryParse(value, out var agencyId))
+                    return agencyId;
+
+                return Guid.Empty;
+            }
+        }
 
         public Guid? BranchId
         {

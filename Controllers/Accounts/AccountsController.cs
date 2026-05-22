@@ -381,5 +381,13 @@ namespace Backend.Controllers.Accounts
             var result = await _accountService.GetAllExchangeSettingsAsync();
             return Ok(result);
         }
+
+
+        [HttpGet("recent-transactions")]
+        public async Task<IActionResult> GetRecentTransactions()
+        {
+            var result = await _accountService.GetRecentTransactionsAsync();
+            return StatusCode(result.StatusCode, result);
+        }
     }
 }

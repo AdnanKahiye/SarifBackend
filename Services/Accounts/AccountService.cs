@@ -2821,14 +2821,54 @@ namespace Backend.Services.Accounts
                     CurrencyId = x.CurrencyId,
                     FeeRate = x.FeeRate,
                     ProfitRate = x.ProfitRate,
-                    IsActive = x.IsActive
+                    IsActive = x.IsActive,
+
+                    CurrencyNmane = x.Currency != null ? x.Currency.Name : ""
                 })
                 .ToListAsync();
         }
 
 
 
+        public async Task<ResponseWrapper<List<RecentTransactionDto>>> GetRecentTransactionsAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
 
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_Recent_10",
+                action: async () =>
+                {
+                    var query = _context.Transactions
+                        .AsNoTracking();
+
+                    if (!isAdmin)
+                    {
+                        query = query.Where(x => x.AgencyId == agencyId);
+                    }
+
+                    var data = await query
+                        .OrderByDescending(x => x.CreatedAt)
+                        .Take(10)
+                        .Select(x => new RecentTransactionDto
+                        {
+                            ReferenceNo = x.ReferenceNo,
+                            Status = x.Status,
+                            TransactionType =x.TransactionType,
+                            TotalAmount = Math.Round((decimal)x.TotalAmount, 2),
+                            CreatedAt = x.CreatedAt,
+                            Username =x.User.FirstName
+                            
+                        })
+                        .ToListAsync();
+
+                    return data;
+                },
+                successMessageFactory: result => $"{result.Count} recent transactions fetched",
+                cacheMessage: "Recent transactions loaded from cache",
+                errorMessage: "Error fetching recent transactions"
+            );
+        }
 
     }
 }
