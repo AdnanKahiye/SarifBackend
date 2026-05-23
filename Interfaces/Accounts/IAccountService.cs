@@ -118,6 +118,7 @@ int pageSize = 10);
         Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountRevenuesLookupAsync();
         Task<ResponseWrapper<List<AccountLookupDto>>> GetAccountExpenseLookupAsync();
         Task<ResponseWrapper<List<RecentTransactionDto>>> GetRecentTransactionsAsync();
+        Task<ResponseWrapper<DashboardCardsDto>> GetDashboardCardsAsync();
 
         Task<ResponseWrapper<PagedResponse<ExchangeDto>>> GetAllExchangesAsync(
             int page = 1,

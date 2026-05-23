@@ -389,5 +389,13 @@ namespace Backend.Controllers.Accounts
             var result = await _accountService.GetRecentTransactionsAsync();
             return StatusCode(result.StatusCode, result);
         }
+
+
+        [HttpGet("dashboard-cards")]
+        public async Task<IActionResult> GetDashboardCards()
+        {
+            var result = await _accountService.GetDashboardCardsAsync();
+            return StatusCode(result.StatusCode, result);
+        }
     }
 }

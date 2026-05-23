@@ -546,34 +546,35 @@ namespace Backend.Services.Accounts
                 var transaction = CreateBaseTransaction(request, baseAmount, referenceNo);
 
                 var details = new List<TransactionDetail>
-        {
-            // 🔴 CREDIT (From Account)
-            new TransactionDetail
-            {
-                Id = Guid.NewGuid(),
-                TransactionId = transaction.Id,
-                AccountId = dto.FromAccountId,
-                CurrencyId = dto.FromCurrencyId,
-                Amount = dto.FromAmount,
-                EntryType = 2,
-                UserId = _currentUser.UserId,
-                CreatedAt = DateTime.UtcNow
-            },
+{
+    // 🟢 DEBIT: You received money
+    // Example: You received 100,000 SOS
+    new TransactionDetail
+    {
+        Id = Guid.NewGuid(),
+        TransactionId = transaction.Id,
+        AccountId = dto.FromAccountId,
+        CurrencyId = dto.FromCurrencyId,
+        Amount = dto.FromAmount,
+        EntryType = 1,
+        UserId = _currentUser.UserId,
+        CreatedAt = DateTime.UtcNow
+    },
 
-            // 🟢 DEBIT (To Account - NET ONLY)
-            new TransactionDetail
-            {
-                Id = Guid.NewGuid(),
-                TransactionId = transaction.Id,
-                AccountId = dto.ToAccountId,
-                CurrencyId = dto.ToCurrencyId,
-                Amount = finalAmount,
-                EntryType = 1,
-                UserId = _currentUser.UserId,
-                CreatedAt = DateTime.UtcNow
-            }
-        };
-
+    // 🔴 CREDIT: You paid money
+    // Example: You paid 3.77 USD
+    new TransactionDetail
+    {
+        Id = Guid.NewGuid(),
+        TransactionId = transaction.Id,
+        AccountId = dto.ToAccountId,
+        CurrencyId = dto.ToCurrencyId,
+        Amount = finalAmount,
+        EntryType = 2,
+        UserId = _currentUser.UserId,
+        CreatedAt = DateTime.UtcNow
+    }
+};
                 // 🔥 ADD PROFIT ONLY (NO CASH DUPLICATION)
                 if (totalRevenue > 0)
                 {
@@ -2870,6 +2871,253 @@ namespace Backend.Services.Accounts
             );
         }
 
+
+
+
+
+        public async Task<ResponseWrapper<DashboardCardsDto>> GetDashboardCardsAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+            var isAdmin = _currentUser.IsInRole("Administrator");
+
+            var todayStart = DateTime.UtcNow.Date;
+            var todayEnd = todayStart.AddDays(1).AddTicks(-1);
+
+            return await ExecuteWithCacheAsync(
+                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_Dashboard_Cards_{todayStart:yyyyMMdd}",
+                action: async () =>
+                {
+                    var transactionDetailsQuery = _context.TransactionDetails
+                        .Include(x => x.Account)
+                        .Include(x => x.Currency)
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (!isAdmin)
+                    {
+                        transactionDetailsQuery = transactionDetailsQuery
+                            .Where(x => x.Account.AgencyId == agencyId);
+                    }
+
+                    // 1. Latest exchange rate for each currency
+                    // Assumption: Rate means 1 base currency = Rate of this currency.
+                    // Example: if base is USD, SOS rate may be 26000.
+                    var latestRates = await _context.ExchangeRates
+                        .AsNoTracking()
+                        .GroupBy(x => x.CurrencyId)
+                        .Select(g => new
+                        {
+                            CurrencyId = g.Key,
+                            Rate = g.OrderByDescending(x => x.CreatedAt)
+                                .Select(x => x.Rate)
+                                .FirstOrDefault()
+                        })
+                        .ToDictionaryAsync(x => x.CurrencyId, x => x.Rate);
+
+                    decimal ToBase(decimal amount, int currencyId)
+                    {
+                        if (!latestRates.TryGetValue(currencyId, out var rate) || rate <= 0)
+                            return 0;
+
+                        return amount / rate;
+                    }
+
+                    // 2. Current balance by currency: Cash + Bank + Wallet
+                    var balancesByCurrency = await transactionDetailsQuery
+                        .Where(x =>
+                            x.Account.AccountType == AccountTypeEnum.Cash ||
+                            x.Account.AccountType == AccountTypeEnum.Bank ||
+                            x.Account.AccountType == AccountTypeEnum.Wallet
+                        )
+                        .GroupBy(x => new
+                        {
+                            x.CurrencyId,
+                            CurrencyCode = x.Currency.Code
+                        })
+                        .Select(g => new DashboardCurrencyCardDto
+                        {
+                            CurrencyId = g.Key.CurrencyId,
+                            CurrencyCode = g.Key.CurrencyCode,
+
+                            Balance = Math.Round(
+                                (
+                                    g.Where(x => x.EntryType == 1)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                                -
+                                (
+                                    g.Where(x => x.EntryType == 2)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                ),
+                                2
+                            )
+                        })
+                        .ToListAsync();
+
+                    var currentBalanceBase = balancesByCurrency
+                        .Sum(x => ToBase(x.Balance, x.CurrencyId));
+
+                    // 3. Cash in / cash out today by currency
+                    var cashFlowTodayByCurrency = await transactionDetailsQuery
+                        .Where(x =>
+                            x.CreatedAt >= todayStart &&
+                            x.CreatedAt <= todayEnd &&
+                            (
+                                x.Account.AccountType == AccountTypeEnum.Cash ||
+                                x.Account.AccountType == AccountTypeEnum.Bank ||
+                                x.Account.AccountType == AccountTypeEnum.Wallet
+                            )
+                        )
+                        .GroupBy(x => new
+                        {
+                            x.CurrencyId,
+                            CurrencyCode = x.Currency.Code
+                        })
+                        .Select(g => new DashboardCurrencyCashFlowDto
+                        {
+                            CurrencyId = g.Key.CurrencyId,
+                            CurrencyCode = g.Key.CurrencyCode,
+
+                            CashInToday = Math.Round(
+                                g.Where(x => x.EntryType == 1)
+                                    .Sum(x => (decimal?)x.Amount) ?? 0,
+                                2
+                            ),
+
+                            CashOutToday = Math.Round(
+                                g.Where(x => x.EntryType == 2)
+                                    .Sum(x => (decimal?)x.Amount) ?? 0,
+                                2
+                            ),
+
+                            NetToday = Math.Round(
+                                (
+                                    g.Where(x => x.EntryType == 1)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                                -
+                                (
+                                    g.Where(x => x.EntryType == 2)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                ),
+                                2
+                            )
+                        })
+                        .ToListAsync();
+
+                    // 4. Total payable account in base currency
+                    // Payable is liability: Credit - Debit
+                    var payableByCurrency = await transactionDetailsQuery
+                        .Where(x => x.Account.AccountType == AccountTypeEnum.PAYABLE)
+                        .GroupBy(x => x.CurrencyId)
+                        .Select(g => new
+                        {
+                            CurrencyId = g.Key,
+
+                            Balance =
+                                (
+                                    g.Where(x => x.EntryType == 2)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                                -
+                                (
+                                    g.Where(x => x.EntryType == 1)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                        })
+                        .ToListAsync();
+
+                    var totalPayableAccountBase = payableByCurrency
+                        .Sum(x => ToBase(x.Balance, x.CurrencyId));
+
+                    // 5. Total receivable account in base currency
+                    // Receivable is asset: Debit - Credit
+                    var receivableByCurrency = await transactionDetailsQuery
+                        .Where(x => x.Account.AccountType == AccountTypeEnum.RECEIVABLE)
+                        .GroupBy(x => x.CurrencyId)
+                        .Select(g => new
+                        {
+                            CurrencyId = g.Key,
+
+                            Balance =
+                                (
+                                    g.Where(x => x.EntryType == 1)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                                -
+                                (
+                                    g.Where(x => x.EntryType == 2)
+                                        .Sum(x => (decimal?)x.Amount) ?? 0
+                                )
+                        })
+                        .ToListAsync();
+
+                    var totalReceivableAccountBase = receivableByCurrency
+                        .Sum(x => ToBase(x.Balance, x.CurrencyId));
+
+                    // 6. Daily profit in base currency: Revenue - Expense
+                    var dailyProfitByCurrency = await transactionDetailsQuery
+                        .Where(x =>
+                            x.CreatedAt >= todayStart &&
+                            x.CreatedAt <= todayEnd
+                        )
+                        .GroupBy(x => x.CurrencyId)
+                        .Select(g => new
+                        {
+                            CurrencyId = g.Key,
+
+                            Revenue = g.Where(x =>
+                                    x.Account.Nature == AccountNatureEnum.Revenue &&
+                                    x.EntryType == 2
+                                )
+                                .Sum(x => (decimal?)x.Amount) ?? 0,
+
+                            Expense = g.Where(x =>
+                                    x.Account.Nature == AccountNatureEnum.Expense &&
+                                    x.EntryType == 1
+                                )
+                                .Sum(x => (decimal?)x.Amount) ?? 0
+                        })
+                        .ToListAsync();
+
+                    var dailyProfitBase = dailyProfitByCurrency
+                        .Sum(x => ToBase(x.Revenue - x.Expense, x.CurrencyId));
+
+                    // 7. Today transaction count
+                    var transactionsQuery = _context.Transactions
+                        .AsNoTracking()
+                        .AsQueryable();
+
+                    if (!isAdmin)
+                    {
+                        transactionsQuery = transactionsQuery
+                            .Where(x => x.AgencyId == agencyId);
+                    }
+
+                    var todayTransactions = await transactionsQuery
+                        .CountAsync(x =>
+                            x.CreatedAt >= todayStart &&
+                            x.CreatedAt <= todayEnd
+                        );
+
+                    return new DashboardCardsDto
+                    {
+                        TotalPayableAccountBase = Math.Round(totalPayableAccountBase, 2),
+                        TotalReceivableAccountBase = Math.Round(totalReceivableAccountBase, 2),
+
+                        CurrentBalanceBase = Math.Round(currentBalanceBase, 2),
+                        DailyProfitBase = Math.Round(dailyProfitBase, 2),
+                        TodayTransactions = todayTransactions,
+
+                        BalancesByCurrency = balancesByCurrency,
+                        CashFlowTodayByCurrency = cashFlowTodayByCurrency
+                    };
+                },
+                successMessageFactory: result => "Dashboard cards fetched successfully",
+                cacheMessage: "Dashboard cards loaded from cache",
+                errorMessage: "Error fetching dashboard cards"
+            );
+        }
     }
 }
 
