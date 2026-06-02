@@ -7,6 +7,7 @@
         public string? LoanNo { get; set; }
 
         public decimal PrincipalAmount { get; set; }
+        public decimal PaidAmount { get; set; }
 
         public decimal? InterestRate { get; set; }
 

@@ -15,6 +15,6 @@ namespace Backend.DTOs.Requests.Accounts
         [Range(0, 1)]
         public decimal ProfitRate { get; set; }
 
-        public bool IsActive { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

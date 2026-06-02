@@ -364,10 +364,14 @@ namespace Backend.Controllers.Accounts
 
         // ==============================
         // ✅ UPDATE
-        // ==============================
-        [HttpPut("exchange-settings")]
-        public async Task<IActionResult> Update([FromBody] UpdateExchangeSettingsDto dto)
+        [HttpPut("exchange-settings/{id:int}")]
+        public async Task<IActionResult> Update(
+        int id,
+        [FromBody] UpdateExchangeSettingsDto dto)
         {
+            if (id != dto.Id)
+                return BadRequest("Route id and body id do not match.");
+
             var result = await _accountService.UpdateExchangeSettingsAsync(dto);
             return Ok(result);
         }

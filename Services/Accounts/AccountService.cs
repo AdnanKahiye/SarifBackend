@@ -659,7 +659,7 @@ namespace Backend.Services.Accounts
             var currencyId = account.CurrencyId;
 
             // ✅ KAN SOO BIXI DIBADDA - ka hor ExecuteWriteAsync
-            var customerPayableAccountId = await GetOrCreateCustomerPayableAccount(dto.CustomerId);
+            var customerPayableAccountId = await GetCustomerPayableAccountAsync(dto.CustomerId);
 
             return await ExecuteWriteAsync(async () =>
             {
@@ -736,7 +736,7 @@ namespace Backend.Services.Accounts
             var currencyId = account.CurrencyId;
 
             // ✅ GetOrCreate isticmaal - MAHA GetCustomerPayableAccount
-            var customerAccountId = await GetOrCreateCustomerPayableAccount(dto.CustomerId);
+            var customerAccountId = await GetCustomerPayableAccountAsync(dto.CustomerId);
 
             var balance = await _context.TransactionDetails
                  .Where(x => x.AccountId == customerAccountId)
@@ -805,6 +805,52 @@ namespace Backend.Services.Accounts
                     CreatedAt = DateTime.UtcNow
                 });
 
+                // ==========================================
+                // 🚀 START: UPDATE MULTIPLE DEPOSITS (FIFO)
+                // ==========================================
+
+                // 1. Waxaan la soo baxaynaa dhammaan deposits-kii u furnaa macmiilkan ee haraaga leh (Amount > 0)
+                var activeDeposits = await _context.Deposits
+                    .Where(b => b.CustomerId == dto.CustomerId && b.Amount > 0)
+                    .OrderBy(b => b.CreatedAt) // Kuwii ugu horreeyay ee la dhigay ayaa lagu bilaabayaa
+                    .ToListAsync();
+
+                var amountToReduce = dto.Amount;
+
+                // 2. Waxaan mid mid u dhex gelaynaa diiwaannada Deposits-ka kor ku xusan
+                foreach (var deposit in activeDeposits)
+                {
+                    if (amountToReduce <= 0) break; // Haddii lacagtii la baxayay la wada gooyay, ka bax
+
+                    // Maadaama Amount uu yahay nullable (decimal?), waxaan u isticmaalaynaa Value-giisa ama 0
+                    var currentDepositAmount = deposit.Amount ?? 0;
+
+                    if (currentDepositAmount >= amountToReduce)
+                    {
+                        // Haddii deposit-kan uu ku filan yahay lacagta la rabo oo dhan
+                        deposit.Amount -= amountToReduce;
+                        amountToReduce = 0; // Lacagtii la rabay waa la wada dhimay
+                    }
+                    else
+                    {
+                        // ✅ SAXID: Marka hore lacagta ka dhiman 'amountToReduce' ka jid (Substract)
+                        amountToReduce -= currentDepositAmount;
+
+                        // ✅ SAXID: Ka dib diiwanka hadda la joogo eber ka dhig mar haddii wixii ku jiray la qaatay
+                        deposit.Amount = 0;
+                    }
+                }
+
+         
+
+
+
+
+
+
+
+
+
                 await _context.SaveChangesAsync();
                 await trx.CommitAsync();
 
@@ -825,7 +871,7 @@ namespace Backend.Services.Accounts
             var account = await GetAccountAsync(dto.AccountId);
             var currencyId = account.CurrencyId;
 
-            var receivableAccountId = await GetOrCreateCustomerReceivableAccount(dto.CustomerId);
+            var receivableAccountId = await GetCustomerReceivableAccountAsync(dto.CustomerId);
 
             return await ExecuteWriteAsync(async () =>
             {
@@ -884,7 +930,7 @@ namespace Backend.Services.Accounts
                             ? null
                             : DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc),
                     LoanNo = referenceNo,
-                    PaidAmount = 0,
+                    PaidAmount =0,
                     CurrencyId = currencyId,
                     AgencyId = _currentUser.AgencyId,
                     BranchId = _currentUser.BranchId,
@@ -921,7 +967,7 @@ namespace Backend.Services.Accounts
 
 
 
-            var receivableAccountId = await GetOrCreateCustomerReceivableAccount(loan.CustomerId);
+            var receivableAccountId = await GetCustomerReceivableAccountAsync(loan.CustomerId);
 
             // 🔒 validation
             var remaining = loan.PrincipalAmount - loan.PaidAmount;
@@ -969,11 +1015,21 @@ namespace Backend.Services.Accounts
                 _context.Transactions.Add(transaction);
                 _context.TransactionDetails.AddRange(details);
 
-                // update loan
-                loan.PaidAmount += dto.Amount;
 
                 if (loan.PaidAmount >= loan.PrincipalAmount)
                     loan.Status = LoanStatusEnum.Closed;
+
+                // Find the business record linked to this loan or customer
+                var business = await _context.Loans
+                    .FirstOrDefaultAsync(b => b.Id == loan.Id); // Adjust foreign key as needed
+
+                if (business != null)
+                {
+                    business.PaidAmount += dto.Amount; // Or business.TotalPaidAmount += dto.Amount;
+                }
+
+
+
 
                 // save repayment
                 _context.LoanPayments.Add(new LoanPayment
@@ -1251,88 +1307,32 @@ namespace Backend.Services.Accounts
             return account.Id;
         }
 
-        // ← KAN KU DAR HALKAN, ka dib GetCustomerReceivableAccount
 
-        private async Task<Guid> GetOrCreateCustomerReceivableAccount(Guid customerId)
+        private async Task<Guid> GetCustomerReceivableAccountAsync(Guid customerId)
         {
             var account = await _context.Accounts
-    .FirstOrDefaultAsync(a =>
-        a.AccountType == AccountTypeEnum.RECEIVABLE &&
-        a.ReferenceId == customerId &&
-        a.AgencyId == _currentUser.AgencyId
-    );
+                .FirstOrDefaultAsync(a =>
+                    a.AccountType == AccountTypeEnum.RECEIVABLE &&
+                    a.ReferenceId == customerId &&
+                    a.AgencyId == _currentUser.AgencyId
+                );
 
-            if (account != null)
-                return account.Id;
-
-            var customer = await _context.Customers.FindAsync(customerId);
-
-            // ← CurrencyId u hel agency-ga default-ka ah
-            var defaultCurrencyId = await _context.Currencies
-                .Where(x => x.IsBase)
-                .Select(x => x.Id)
-                .FirstOrDefaultAsync();
-
-            var newAccount = new Account
-            {
-                Id = Guid.NewGuid(),
-                Name = $"{customer?.FullName ?? "Customer"} - Receivable",
-                AccountType = AccountTypeEnum.RECEIVABLE,
-                Nature = AccountNatureEnum.Asset,
-                ReferenceId = customerId,
-                CurrencyId = defaultCurrencyId, // ← KAN KU DAR
-                UserId = _currentUser.UserId,
-                AgencyId = _currentUser.AgencyId,
-                BranchId = _currentUser.BranchId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.Accounts.Add(newAccount);
-            await _context.SaveChangesAsync();
-
-            return newAccount.Id;
+            // If found, return the ID; otherwise, return an empty Guid
+            return account?.Id ?? Guid.Empty;
         }
 
         // ← KAN KU DAR HALKAN, ka dib GetCustomerPayableAccount
-        private async Task<Guid> GetOrCreateCustomerPayableAccount(Guid customerId)
+        private async Task<Guid> GetCustomerPayableAccountAsync(Guid customerId)
         {
             var account = await _context.Accounts
-    .FirstOrDefaultAsync(a =>
-        a.AccountType == AccountTypeEnum.PAYABLE &&
-        a.ReferenceId == customerId &&
-        a.AgencyId == _currentUser.AgencyId
-    );
+                .FirstOrDefaultAsync(a =>
+                    a.AccountType == AccountTypeEnum.PAYABLE &&
+                    a.ReferenceId == customerId &&
+                    a.AgencyId == _currentUser.AgencyId
+                );
 
-            if (account != null)
-                return account.Id;
-
-            var customer = await _context.Customers.FindAsync(customerId);
-
-            var defaultCurrencyId = await _context.Currencies
-                .Where(x => x.IsBase)
-                .Select(x => x.Id)
-                .FirstOrDefaultAsync();
-
-            var newAccount = new Account
-            {
-                Id = Guid.NewGuid(),
-                Name = $"{customer?.FullName ?? "Customer"} - Payable",
-                AccountType = AccountTypeEnum.PAYABLE,
-                Nature = AccountNatureEnum.Liability,
-                ReferenceId = customerId,
-                CurrencyId = defaultCurrencyId,
-                UserId = _currentUser.UserId,
-                AgencyId = _currentUser.AgencyId,
-                BranchId = _currentUser.BranchId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.Accounts.Add(newAccount);
-            await _context.SaveChangesAsync();
-
-            return newAccount.Id;
+            // Haddii la helo ID-ga soo culi; haddii kale soo culi Guid.Empty (00000000-0000-0000-0000-000000000000)
+            return account?.Id ?? Guid.Empty;
         }
 
         // ================================
@@ -2739,7 +2739,7 @@ namespace Backend.Services.Accounts
                     query = query.Where(x =>
                         x.AccountType == AccountTypeEnum.Cash ||
                         x.AccountType == AccountTypeEnum.Bank ||
-                        x.AccountType == AccountTypeEnum.Wallet
+                        x.AccountType == AccountTypeEnum.Wallet 
                     );
 
                     var data = await query

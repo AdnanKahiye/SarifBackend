@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // =====================================================
 
 // LOAD ENV FILE
-Env.Load(Path.Combine(builder.Environment.ContentRootPath, ".env.local"));
+Env.Load(Path.Combine(builder.Environment.ContentRootPath, ".env"));
 // read port from env
 var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
 
