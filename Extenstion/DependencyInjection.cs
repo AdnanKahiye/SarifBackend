@@ -340,8 +340,8 @@ namespace Backend.Extenstion
                             "http://localhost:3000",
                             "http://localhost:5173",
                             "http://127.0.0.1",
-                            "https://www.sarif-fontend-git-main-kahiyes-projects.vercel.app",
-                            "https://sarif-fontend-git-main-kahiyes-projects.vercel.app"
+                            "https://www.sarif-fontend.vercel.app",
+                            "https://sarif-fontend.vercel.app"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
