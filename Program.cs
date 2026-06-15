@@ -50,8 +50,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://127.0.0.1",
-                 "https://www.sarif-fontend.vercel.app",
-                  "https://sarif-fontend.vercel.app"
+                 "https://sarif-fontend-nine.vercel.app",
+                  "https://sarif-fontend-nine.vercel.app"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
