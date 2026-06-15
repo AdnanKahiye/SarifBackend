@@ -51,7 +51,7 @@ builder.Services.AddCors(options =>
                 "http://localhost:5173",
                 "http://127.0.0.1",
                 "https://www.adnankahiye.com",
-                "https://adnankahiye.com"
+                "https://sarif-fontend-git-main-kahiyes-projects.vercel.app"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
