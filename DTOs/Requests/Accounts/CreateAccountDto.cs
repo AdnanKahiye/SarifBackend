@@ -3,7 +3,10 @@
 namespace Backend.DTOs.Requests.Accounts
 {
     public class CreateAccountDto
-    {
+    {                  
+
+
+        
         [Required]
         [MaxLength(150)]
         public string Name { get; set; } = string.Empty;
