@@ -524,8 +524,11 @@ namespace Backend.Services.Accounts
             var settings = await GetExchangeSettings(dto.ToCurrencyId);
 
             // 🔥 Calculate fee & profit (BASE currency)
-            var fee = baseAmount * settings.FeeRate;
-            var profit = baseAmount * settings.ProfitRate;
+            //var fee = baseAmount * settings.FeeRate;
+            //var profit = baseAmount * settings.ProfitRate;
+
+            var fee = baseAmount * (settings.FeeRate / 100m);
+            var profit = baseAmount * (settings.ProfitRate / 100m);
 
             var totalRevenue = fee + profit;
 
