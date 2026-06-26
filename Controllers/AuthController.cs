@@ -25,17 +25,6 @@ namespace Backend.Controllers
             _userManager = userManager;
         }
 
-
-
-
-
-
-
-
-
-
-
-
         [HttpGet("me")]
         [Authorize]
         public async Task<IActionResult> Me()

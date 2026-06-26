@@ -1548,138 +1548,153 @@ namespace Backend.Services.Accounts
         }
 
 
-        public async Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>> GetAccountBalancesSummaryAsync(
-          int page = 1,
-          int pageSize = 10,
-          DateTime? fromDate = null,
-          DateTime? toDate = null,
-          AccountTypeEnum? accountType = null)
+   public async Task<ResponseWrapper<PagedResponse<AccountBalanceSummaryDto>>> GetAccountBalancesSummaryAsync(
+    int page = 1,
+    int pageSize = 10,
+    DateTime? fromDate = null,
+    DateTime? toDate = null,
+    AccountTypeEnum? accountType = null)
+{
+    if (page <= 0) page = 1;
+    if (pageSize <= 0) pageSize = 10;
+    pageSize = Math.Min(pageSize, 100);
+
+    var agencyId = _currentUser.AgencyId;
+    var isAdmin = _currentUser.IsInRole("Administrator");
+
+    return await ExecuteWithCacheAsync(
+        cacheKey: $"{AccountCacheKey}_Summary_{_currentUser.UserId}_P{page}_PS{pageSize}_T{accountType}_F{fromDate?.ToString("yyyy-MM-dd")}_TO{toDate?.ToString("yyyy-MM-dd")}",
+
+        action: async () =>
         {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
-            pageSize = Math.Min(pageSize, 100);
+            var query = _context.Accounts
+                .Include(x => x.Currency)
+                .AsNoTracking()
+                .AsQueryable();
 
-            var agencyId = _currentUser.AgencyId;
-            var isAdmin = _currentUser.IsInRole("Administrator");
+            if (!isAdmin)
+                query = query.Where(x => x.AgencyId == agencyId);
 
-            return await ExecuteWithCacheAsync(
-                // ✅ FIXED CACHE KEY
-                cacheKey: $"{AccountCacheKey}_Summary_{_currentUser.UserId}_P{page}_PS{pageSize}_T{accountType}_F{fromDate?.ToString("yyyy-MM-dd")}_TO{toDate?.ToString("yyyy-MM-dd")}",
+            if (accountType.HasValue)
+                query = query.Where(x => x.AccountType == accountType.Value);
 
-                action: async () =>
+            var totalRecords = await query.CountAsync();
+
+            var pagedAccounts = await query
+                .OrderBy(x => x.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var accountIds = pagedAccounts.Select(a => a.Id).ToList();
+
+            if (!accountIds.Any())
+            {
+                return new PagedResponse<AccountBalanceSummaryDto>(
+                    new List<AccountBalanceSummaryDto>(),
+                    page,
+                    pageSize,
+                    totalRecords
+                );
+            }
+
+            var transactionQuery = _context.TransactionDetails
+                .AsNoTracking()
+                .Where(td => accountIds.Contains(td.AccountId));
+
+            if (fromDate.HasValue)
+            {
+                var startDate = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+                transactionQuery = transactionQuery.Where(td => td.CreatedAt >= startDate);
+            }
+
+            if (toDate.HasValue)
+            {
+                var nextDay = DateTime.SpecifyKind(toDate.Value.Date.AddDays(1), DateTimeKind.Utc);
+                transactionQuery = transactionQuery.Where(td => td.CreatedAt < nextDay);
+            }
+
+            var balances = await transactionQuery
+                .GroupBy(td => td.AccountId)
+                .Select(g => new
                 {
-                    // 1. Accounts Query
-                    var query = _context.Accounts
-                        .Include(x => x.Currency)
-                        .AsNoTracking();
+                    AccountId = g.Key,
 
-                    if (!isAdmin)
-                    {
-                        query = query.Where(x => x.AgencyId == agencyId);
-                    }
+                    Debit = Math.Round(
+                        g.Where(x => x.EntryType == 1)
+                         .Select(x => (decimal?)x.Amount)
+                         .Sum() ?? 0m,
+                        4
+                    ),
 
-                    if (accountType.HasValue)
-                    {
-                        query = query.Where(x => x.AccountType == accountType.Value);
-                    }
+                    Credit = Math.Round(
+                        g.Where(x => x.EntryType == 2)
+                         .Select(x => (decimal?)x.Amount)
+                         .Sum() ?? 0m,
+                        4
+                    )
+                })
+                .ToDictionaryAsync(x => x.AccountId);
 
-                    var totalRecords = await query.CountAsync();
+            var mappedResult = pagedAccounts.Select(acc =>
+            {
+                balances.TryGetValue(acc.Id, out var bal);
 
-                    var pagedAccounts = await query
-                        .OrderBy(x => x.Name)
-                        .Skip((page - 1) * pageSize)
-                        .Take(pageSize)
-                        .ToListAsync();
+                var debit = bal?.Debit ?? 0m;
+                var credit = bal?.Credit ?? 0m;
 
-                    var accountIds = pagedAccounts.Select(a => a.Id).ToList();
+                var balance = acc.Nature switch
+                {
+                    AccountNatureEnum.Asset => debit - credit,
+                    AccountNatureEnum.Expense => debit - credit,
 
-                    // 2. Transaction Query (DATE FIXED)
-                    var transactionQuery = _context.TransactionDetails
-                        .Where(td => accountIds.Contains(td.AccountId));
+                    AccountNatureEnum.Liability => credit - debit,
+                    AccountNatureEnum.Equity => credit - debit,
+                    AccountNatureEnum.Revenue => credit - debit,
 
-                    if (fromDate.HasValue)
-                    {
-                        transactionQuery = transactionQuery.Where(td => td.CreatedAt >= fromDate.Value.Date);
-                    }
+                    _ => 0m
+                };
 
-                    if (toDate.HasValue)
-                    {
-                        var endDate = toDate.Value.Date.AddDays(1).AddTicks(-1); // ✅ IMPORTANT FIX
-                        transactionQuery = transactionQuery.Where(td => td.CreatedAt <= endDate);
-                    }
+                return new AccountBalanceSummaryDto
+                {
+                    AccountId = acc.Id,
+                    AccountName = acc.Name,
+                    CurrencyCode = acc.Currency?.Code ?? "N/A",
+                    TotalDebit = debit,
+                    TotalCredit = credit,
+                    Balance = balance
+                };
+            }).ToList();
 
-                    // 3. Group Balances
-                    var balances = await transactionQuery
-                        .GroupBy(td => td.AccountId)
-                        .Select(g => new
-                        {
-                            AccountId = g.Key,
-                            Debit = g.Where(x => x.EntryType == 1).Sum(x => x.Amount),
-                            Credit = g.Where(x => x.EntryType == 2).Sum(x => x.Amount)
-                        })
-                        .ToDictionaryAsync(x => x.AccountId);
-
-                    // 4. Mapping
-                    var mappedResult = pagedAccounts.Select(acc =>
-                    {
-                        balances.TryGetValue(acc.Id, out var bal);
-
-                        var debit = bal?.Debit ?? 0;
-                        var credit = bal?.Credit ?? 0;
-
-                        var balance = acc.Nature switch
-                        {
-                            AccountNatureEnum.Asset => debit - credit,
-                            AccountNatureEnum.Expense => debit - credit,
-
-                            AccountNatureEnum.Liability => credit - debit,
-                            AccountNatureEnum.Equity => credit - debit,
-                            AccountNatureEnum.Revenue => credit - debit,
-
-                            _ => 0
-                        };
-
-                        return new AccountBalanceSummaryDto
-                        {
-                            AccountId = acc.Id,
-                            AccountName = acc.Name,
-                            CurrencyCode = acc.Currency?.Code ?? "N/A",
-                            TotalDebit = debit,
-                            TotalCredit = credit,
-                            Balance = balance
-                        };
-                    }).ToList();
-
-                    return new PagedResponse<AccountBalanceSummaryDto>(
-                        mappedResult,
-                        page,
-                        pageSize,
-                        totalRecords
-                    );
-                },
-
-                successMessageFactory: r => $"{r.Data.Count} account balances fetched",
-                cacheMessage: "Balances loaded from cache",
-                errorMessage: "Error calculating balances"
+            return new PagedResponse<AccountBalanceSummaryDto>(
+                mappedResult,
+                page,
+                pageSize,
+                totalRecords
             );
-        }
+        },
 
+        successMessageFactory: r => $"{r.Data.Count} account balances fetched",
+        cacheMessage: "Balances loaded from cache",
+        errorMessage: "Error calculating balances"
+    );
+}
 
         public async Task<ResponseWrapper<PagedResponse<TransactionDetailDto>>> GetAccountStatementAsync(
-     Guid accountId,
-     int page = 1,
-     int pageSize = 10,
-     byte? entryType = null,          // 1=Debit, 2=Credit
-     DateTime? fromDate = null,
-     DateTime? toDate = null)
-        {
-            // 1. Guard Clauses
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
-            pageSize = Math.Min(pageSize, 100);
+                     Guid accountId,
+                     int page = 1,
+                     int pageSize = 10,
+                     byte? entryType = null,          // 1=Debit, 2=Credit
+                     DateTime? fromDate = null,
+                     DateTime? toDate = null)
+                        {
+                            // 1. Guard Clauses
+                            if (page <= 0) page = 1;
+                            if (pageSize <= 0) pageSize = 10;
+                            pageSize = Math.Min(pageSize, 100);
 
-            var agencyId = _currentUser.AgencyId;
-            var isAdmin = _currentUser.IsInRole("Administrator");
+                            var agencyId = _currentUser.AgencyId;
+                            var isAdmin = _currentUser.IsInRole("Administrator");
 
             // ✅ FIX: Normalize dates to UTC BEFORE cacheKey
             DateTime? startDate = null;
