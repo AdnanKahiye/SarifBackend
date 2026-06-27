@@ -8,6 +8,8 @@
 
         public decimal Amount { get; set; }
         public DateTime PaymentDate { get; set; }
+        public int CurrencyId { get; set; }
+        public string CurrencyCode { get; set; } = "";
         public string? Note { get; set; }
 
         public Guid TransactionId { get; set; }

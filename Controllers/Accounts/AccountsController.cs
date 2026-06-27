@@ -401,5 +401,42 @@ namespace Backend.Controllers.Accounts
             var result = await _accountService.GetDashboardCardsAsync();
             return StatusCode(result.StatusCode, result);
         }
+
+
+        [HttpGet("cash-opening-report")]
+        public async Task<IActionResult> GetCashOpeningReport(DateTime? fromDate, DateTime? toDate)
+        {
+            var result = await _accountService.GetCashOpeningReportAsync(fromDate, toDate);
+            return StatusCode(result.StatusCode, result);
+        }
+        [HttpGet("daily-cash-report")]
+        public async Task<IActionResult> GetDailyCashReport(
+            DateTime? date,
+            Guid? accountId,
+            int? currencyId)
+        {
+            var result = await _accountService.GetDailyCashReportAsync(date, accountId, currencyId);
+            return StatusCode(result.StatusCode, result);
+        }
+
+
+        [HttpGet("main-cash-accounts")]
+        public async Task<IActionResult> GetMainCashAccounts()
+        {
+            var result = await _accountService.GetMainCashAccountsAsync();
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpGet("capital-accounts")]
+        public async Task<IActionResult> GetCapitalAccounts()
+        {
+            var result = await _accountService.GetCapitalAccountsAsync();
+            return StatusCode(result.StatusCode, result);
+        }
+
+
+
+
+
     }
 }

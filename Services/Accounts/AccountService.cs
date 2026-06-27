@@ -495,11 +495,81 @@ namespace Backend.Services.Accounts
                 TransactionTypeEnum.Withdraw => await CreateWithdrawAsync(request),
                 TransactionTypeEnum.Repayment => await CreateRepaymentAsync(request),
                 TransactionTypeEnum.Revenue => await CreateRevenueAsync(request),
+                TransactionTypeEnum.CashOpening => await CreateCashOpeningAsync(request),
 
                 _ => await ResponseWrapper<Guid>.FailureAsync(
                     "Validation Error",
                     "Invalid type")
             };
+        }
+
+
+
+        private async Task<ResponseWrapper<Guid>> CreateCashOpeningAsync(CreateTransactionRequest request)
+        {
+            var dto = request.CashOpening;
+
+            if (dto == null)
+                return await ResponseWrapper<Guid>.FailureAsync("Cash opening required");
+
+            var cashAccount = await GetAccountAsync(dto.CashAccountId);
+            var capitalAccount = await GetAccountAsync(dto.CapitalAccountId);
+
+            if (cashAccount.AccountType != AccountTypeEnum.Cash)
+                return await ResponseWrapper<Guid>.FailureAsync("Selected account must be Cash account");
+
+            if (capitalAccount.AccountType != AccountTypeEnum.Capital)
+                return await ResponseWrapper<Guid>.FailureAsync("Selected account must be Capital account");
+
+            if (cashAccount.CurrencyId != capitalAccount.CurrencyId)
+                return await ResponseWrapper<Guid>.FailureAsync("Currency mismatch");
+
+            var currencyId = cashAccount.CurrencyId;
+
+            return await ExecuteWriteAsync(async () =>
+            {
+                using var trx = await _context.Database.BeginTransactionAsync();
+
+                var referenceNo = GenerateReferenceNo();
+
+                var transaction = CreateBaseTransaction(request, dto.Amount, referenceNo);
+
+                var details = new List<TransactionDetail>
+        {
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.CashAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 1, // Debit, cash increases
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            },
+
+            new TransactionDetail
+            {
+                Id = Guid.NewGuid(),
+                TransactionId = transaction.Id,
+                AccountId = dto.CapitalAccountId,
+                CurrencyId = currencyId,
+                Amount = dto.Amount,
+                EntryType = 2, // Credit, capital increases
+                UserId = _currentUser.UserId,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+                _context.Transactions.Add(transaction);
+                _context.TransactionDetails.AddRange(details);
+
+                await _context.SaveChangesAsync();
+                await trx.CommitAsync();
+
+                return transaction.Id;
+
+            }, "Cash opening created", "Error creating cash opening");
         }
 
         private async Task<ResponseWrapper<Guid>> CreateExchangeAsync(CreateTransactionRequest request)
@@ -1949,47 +2019,37 @@ namespace Backend.Services.Accounts
             DateTime? fromDate = null,
             DateTime? toDate = null)
         {
-            // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                // ✅ include filters in cache key
                 cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_L_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
                     var query = _context.Loans
+                        .Include(x => x.Currency)
                         .AsNoTracking()
                         .AsQueryable();
 
-                    // 3. Multi-tenant filter
                     if (!isAdmin)
-                    {
                         query = query.Where(x => x.AgencyId == agencyId);
-                    }
 
-                    // ✅ 4. Date Filters with UTC FIX
                     if (fromDate.HasValue)
                     {
-                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
-                            ? fromDate.Value
-                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
-
+                        var fromUtc = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
                         query = query.Where(x => x.CreatedAt >= fromUtc);
                     }
 
                     if (toDate.HasValue)
                     {
-                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
-
-                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
-                            ? endOfDay
-                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+                        var toUtc = DateTime.SpecifyKind(
+                            toDate.Value.Date.AddDays(1).AddTicks(-1),
+                            DateTimeKind.Utc
+                        );
 
                         query = query.Where(x => x.CreatedAt <= toUtc);
                     }
@@ -2219,52 +2279,43 @@ namespace Backend.Services.Accounts
 
 
         public async Task<ResponseWrapper<PagedResponse<LoanPaymentDto>>> GetAllLoanPaymentAsync(
-            int page = 1,
-            int pageSize = 10,
-            DateTime? fromDate = null,
-            DateTime? toDate = null)
+        int page = 1,
+        int pageSize = 10,
+        DateTime? fromDate = null,
+        DateTime? toDate = null)
         {
-            // 1. Guard Clauses
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                // ✅ include filters in cache key
                 cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_LP_P{page}_PS{pageSize}_{fromDate}_{toDate}",
                 action: async () =>
                 {
                     var query = _context.LoanPayments
+                        .Include(x => x.Loan)
+                            .ThenInclude(x => x.Currency)
                         .AsNoTracking()
                         .AsQueryable();
 
-                    // 3. Multi-tenant filter
                     if (!isAdmin)
-                    {
                         query = query.Where(x => x.AgencyId == agencyId);
-                    }
 
-                    // ✅ 4. Date Filters with UTC FIX
                     if (fromDate.HasValue)
                     {
-                        var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
-                            ? fromDate.Value
-                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
-
+                        var fromUtc = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
                         query = query.Where(x => x.CreatedAt >= fromUtc);
                     }
 
                     if (toDate.HasValue)
                     {
-                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
-
-                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
-                            ? endOfDay
-                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+                        var toUtc = DateTime.SpecifyKind(
+                            toDate.Value.Date.AddDays(1).AddTicks(-1),
+                            DateTimeKind.Utc
+                        );
 
                         query = query.Where(x => x.CreatedAt <= toUtc);
                     }
@@ -2966,6 +3017,63 @@ namespace Backend.Services.Accounts
 
 
 
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetMainCashAccountsAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+
+            var data = await _context.Accounts
+                .Include(x => x.Currency)
+                .Where(x =>
+                    x.AgencyId == agencyId &&
+                    x.AccountType == AccountTypeEnum.Cash)
+                .OrderBy(x => x.Currency.Code)
+                .ThenBy(x => x.Name)
+                .Select(x => new AccountLookupDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    CurrencyId = x.CurrencyId,
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return await ResponseWrapper<List<AccountLookupDto>>.SuccessAsync(
+                data,
+                "Main cash accounts fetched successfully"
+            );
+        }
+
+
+
+
+        public async Task<ResponseWrapper<List<AccountLookupDto>>> GetCapitalAccountsAsync()
+        {
+            var agencyId = _currentUser.AgencyId;
+
+            var data = await _context.Accounts
+                .Include(x => x.Currency)
+                .Where(x =>
+                    x.AgencyId == agencyId &&
+                    x.AccountType == AccountTypeEnum.Capital)
+                .OrderBy(x => x.Currency.Code)
+                .ThenBy(x => x.Name)
+                .Select(x => new AccountLookupDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    CurrencyId = x.CurrencyId,
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return await ResponseWrapper<List<AccountLookupDto>>.SuccessAsync(
+                data,
+                "Capital accounts fetched successfully"
+            );
+        }
+
+
+
         public async Task<ResponseWrapper<DashboardCardsDto>> GetDashboardCardsAsync()
         {
             var agencyId = _currentUser.AgencyId;
@@ -3209,6 +3317,182 @@ namespace Backend.Services.Accounts
                 errorMessage: "Error fetching dashboard cards"
             );
         }
+
+
+
+        public async Task<ResponseWrapper<List<CashOpeningReportDto>>> GetCashOpeningReportAsync(
+    DateTime? fromDate = null,
+    DateTime? toDate = null)
+        {
+            var agencyId = _currentUser.AgencyId;
+
+            var query = _context.Transactions
+                .Include(t => t.Details)
+                    .ThenInclude(d => d.Account)
+                .Include(t => t.Details)
+                    .ThenInclude(d => d.Currency)
+                .Where(t =>
+                    t.TransactionType == TransactionTypeEnum.CashOpening &&
+                    t.AgencyId == agencyId)
+                .AsNoTracking();
+
+            if (fromDate.HasValue)
+                query = query.Where(t => t.CreatedAt >= DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc));
+
+            if (toDate.HasValue)
+            {
+                var endDate = DateTime.SpecifyKind(toDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+                query = query.Where(t => t.CreatedAt <= endDate);
+            }
+
+            var data = await query
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new CashOpeningReportDto
+                {
+                    TransactionId = t.Id,
+                    ReferenceNo = t.ReferenceNo,
+                    Date = t.CreatedAt,
+
+                    CashAccountName = t.Details
+                        .Where(d => d.EntryType == 1)
+                        .Select(d => d.Account.Name)
+                        .FirstOrDefault() ?? "",
+
+                    CapitalAccountName = t.Details
+                        .Where(d => d.EntryType == 2)
+                        .Select(d => d.Account.Name)
+                        .FirstOrDefault() ?? "",
+
+                    CurrencyCode = t.Details
+                        .Select(d => d.Currency.Code)
+                        .FirstOrDefault() ?? "",
+
+                    Amount = t.TotalAmount,
+                    Description = t.Description
+                })
+                .ToListAsync();
+
+            return await ResponseWrapper<List<CashOpeningReportDto>>.SuccessAsync(
+                data,
+                "Cash opening report fetched successfully"
+            );
+        }
+
+
+
+        public async Task<ResponseWrapper<List<DailyCashReportDto>>> GetDailyCashReportAsync(
+    DateTime? date = null,
+    Guid? accountId = null,
+    int? currencyId = null)
+        {
+            var agencyId = _currentUser.AgencyId;
+
+            var reportDate = date?.Date ?? DateTime.UtcNow.Date;
+
+            var startDate = DateTime.SpecifyKind(reportDate, DateTimeKind.Utc);
+            var endDate = DateTime.SpecifyKind(reportDate.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+            var accountsQuery = _context.Accounts
+                .Include(a => a.Currency)
+                .Where(a =>
+                    a.AgencyId == agencyId &&
+                    (
+                        a.AccountType == AccountTypeEnum.Cash ||
+                        a.AccountType == AccountTypeEnum.Bank ||
+                        a.AccountType == AccountTypeEnum.Wallet
+                    ));
+
+            if (accountId.HasValue)
+                accountsQuery = accountsQuery.Where(a => a.Id == accountId.Value);
+
+            if (currencyId.HasValue)
+                accountsQuery = accountsQuery.Where(a => a.CurrencyId == currencyId.Value);
+
+            var accounts = await accountsQuery.AsNoTracking().ToListAsync();
+
+            var accountIds = accounts.Select(a => a.Id).ToList();
+
+            if (!accountIds.Any())
+            {
+                return await ResponseWrapper<List<DailyCashReportDto>>.SuccessAsync(
+                    new List<DailyCashReportDto>(),
+                    "Daily cash report fetched successfully"
+                );
+            }
+
+            var details = await _context.TransactionDetails
+                .Include(d => d.Transaction)
+                .Where(d =>
+                    accountIds.Contains(d.AccountId) &&
+                    d.Transaction != null &&
+                    d.Transaction.AgencyId == agencyId &&
+                    d.Transaction.CreatedAt <= endDate)
+                .Select(d => new
+                {
+                    d.AccountId,
+                    d.EntryType,
+                    d.Amount,
+                    TransactionDate = d.Transaction.CreatedAt
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var report = accounts.Select(acc =>
+            {
+                var accDetails = details.Where(d => d.AccountId == acc.Id).ToList();
+
+                var beforeToday = accDetails
+                    .Where(d => d.TransactionDate < startDate);
+
+                var today = accDetails
+                    .Where(d => d.TransactionDate >= startDate && d.TransactionDate <= endDate);
+
+                var openingDebit = beforeToday
+                    .Where(x => x.EntryType == 1)
+                    .Sum(x => x.Amount);
+
+                var openingCredit = beforeToday
+                    .Where(x => x.EntryType == 2)
+                    .Sum(x => x.Amount);
+
+                var openingCash = openingDebit - openingCredit;
+
+                var cashIn = today
+                    .Where(x => x.EntryType == 1)
+                    .Sum(x => x.Amount);
+
+                var cashOut = today
+                    .Where(x => x.EntryType == 2)
+                    .Sum(x => x.Amount);
+
+                var closing = openingCash + cashIn - cashOut;
+
+                return new DailyCashReportDto
+                {
+                    AccountId = acc.Id,
+                    AccountName = acc.Name,
+                    CurrencyCode = acc.Currency?.Code ?? "N/A",
+                    OpeningCash = Math.Round(openingCash, 2),
+                    CashIn = Math.Round(cashIn, 2),
+                    CashOut = Math.Round(cashOut, 2),
+                    SystemClosingCash = Math.Round(closing, 2)
+                };
+            }).ToList();
+
+            return await ResponseWrapper<List<DailyCashReportDto>>.SuccessAsync(
+                report,
+                "Daily cash report fetched successfully"
+            );
+        }
+
+
+
+
+
+
+
+
+
     }
 }
 

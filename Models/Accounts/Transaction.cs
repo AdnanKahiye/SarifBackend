@@ -32,7 +32,8 @@ namespace Backend.Models.Accounts
         Loan = 5,
         Repayment = 6,
         Expense = 7,
-        Revenue =8
+        Revenue =8,
+        CashOpening = 9
     }
 
     public enum TransactionStatusEnum

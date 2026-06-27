@@ -19,5 +19,6 @@ namespace Backend.DTOs.Requests.Accounts
         public CreateWithdrawDto? Withdraw { get; set; }
         public CreateRepaymentDto? Repayment { get; set; }
         public RevenueDetailsDto? Revenue { get; set; }
+        public CashOpeningDto? CashOpening { get; set; }
     }
 }

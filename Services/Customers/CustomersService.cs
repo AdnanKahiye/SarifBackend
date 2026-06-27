@@ -12,6 +12,7 @@ using Backend.Utiliy;
 using Backend.Wrapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Backend.Models.Accounts;
 
 namespace Backend.Services.Customers
 {
@@ -23,6 +24,7 @@ namespace Backend.Services.Customers
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         private const string CustomerCacheKey = "CustomerCache";
+        private const string AccountCacheKey = "AccountCache";
 
         public CustomersService(
                             AppDbContext context,
@@ -47,43 +49,97 @@ namespace Backend.Services.Customers
         {
             if (string.IsNullOrEmpty(_currentUser.UserId))
             {
-                return await ResponseWrapper<Guid>.FailureAsync("Unauthorized", "User not authenticated", 401);
+                return await ResponseWrapper<Guid>.FailureAsync(
+                    "Unauthorized",
+                    "User not authenticated",
+                    401
+                );
             }
 
             return await ExecuteWriteAsync(async () =>
             {
+                await using var trx = await _context.Database.BeginTransactionAsync();
+
                 try
                 {
-                    var entity = _mapper.Map<Models.Customers.Customer>(dto);
+                    var customer = _mapper.Map<Models.Customers.Customer>(dto);
 
-                    entity.Id = Guid.NewGuid();
-                    entity.UserId = _currentUser.UserId;
-                    entity.AgencyId = _currentUser.AgencyId;
-                    entity.BranchId = _currentUser.BranchId;
-                    entity.CreatedAt = DateTime.UtcNow;
-                    entity.UpdatedAt = DateTime.UtcNow;
+                    customer.Id = Guid.NewGuid();
+                    customer.UserId = _currentUser.UserId;
+                    customer.AgencyId = _currentUser.AgencyId;
+                    customer.BranchId = _currentUser.BranchId;
+                    customer.CreatedAt = DateTime.UtcNow;
+                    customer.UpdatedAt = DateTime.UtcNow;
 
+                    _context.Customers.Add(customer);
 
-                    _context.Customers.Add(entity);
+                    var currencies = await _context.Currencies
+                        .Where(c => c.UserId == _currentUser.UserId)
+                        .AsNoTracking()
+                        .ToListAsync();
+
+                    if (!currencies.Any())
+                        throw new Exception("No currencies found. Please create currencies first.");
+
+                    var accounts = new List<Account>();
+
+                    foreach (var currency in currencies)
+                    {
+                        accounts.Add(new Account
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = $"{customer.FullName+"-"+customer.PhoneNumber} Receivable {currency.Code}",
+                            AccountType = AccountTypeEnum.RECEIVABLE,
+                            Nature = AccountHelper.GetNature(AccountTypeEnum.RECEIVABLE),
+                            ReferenceId = customer.Id,
+                            CurrencyId = currency.Id,
+                            AgencyId = _currentUser.AgencyId,
+                            BranchId = _currentUser.BranchId,
+                            UserId = _currentUser.UserId,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+
+                        accounts.Add(new Account
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = $"{customer.FullName + "-" + customer.PhoneNumber} Payable {currency.Code}",
+                            AccountType = AccountTypeEnum.PAYABLE,
+                            Nature = AccountHelper.GetNature(AccountTypeEnum.PAYABLE),
+                            ReferenceId = customer.Id,
+                            CurrencyId = currency.Id,
+                            AgencyId = _currentUser.AgencyId,
+                            BranchId = _currentUser.BranchId,
+                            UserId = _currentUser.UserId,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    _context.Accounts.AddRange(accounts);
+
                     await _context.SaveChangesAsync();
+                    await trx.CommitAsync();
 
                     RemoveByPrefix(CustomerCacheKey);
+                    RemoveByPrefix(AccountCacheKey);
 
-                    return entity.Id;
+                    return customer.Id;
                 }
                 catch (DbUpdateException ex)
                 {
+                    await trx.RollbackAsync();
                     var msg = ex.InnerException?.Message ?? ex.Message;
-                    throw new Exception($"Database error while creating agency: {msg}");
+                    throw new Exception($"Database error while creating customer: {msg}");
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"Unexpected error while creating agency: {ex.Message}");
+                    await trx.RollbackAsync();
+                    throw new Exception($"Unexpected error while creating customer: {ex.Message}");
                 }
 
             }, "Customer created successfully", "Error creating customer");
         }
-
 
         public async Task<ResponseWrapper<PagedResponse<CustomerDto>>> GetAllCustomerAsync(int page = 1, int pageSize = 10)
         {

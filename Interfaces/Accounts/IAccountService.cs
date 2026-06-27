@@ -166,5 +166,17 @@ int pageSize = 10);
      DateTime? toDate = null
  );
 
+        Task<ResponseWrapper<List<DailyCashReportDto>>> GetDailyCashReportAsync(
+     DateTime? date,
+     Guid? accountId = null,
+     int? currencyId = null);
+
+        Task<ResponseWrapper<List<CashOpeningReportDto>>> GetCashOpeningReportAsync(
+    DateTime? fromDate = null,
+    DateTime? toDate = null);
+
+        Task<ResponseWrapper<List<AccountLookupDto>>> GetMainCashAccountsAsync();
+        Task<ResponseWrapper<List<AccountLookupDto>>> GetCapitalAccountsAsync();
+
     }
 }

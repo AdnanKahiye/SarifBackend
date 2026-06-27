@@ -42,13 +42,13 @@ namespace Backend.Models.Accounts
         Cash = 1,
         Bank = 2,
         Wallet = 3,
-        Customer = 4,
         Loan = 5,
         Expense = 6,
         Revenue = 7,
         Capital = 8 ,
         RECEIVABLE=9,
         PAYABLE = 10
+
     }
 
     // 👉 Accounting Nature (Reports)
@@ -72,7 +72,6 @@ namespace Backend.Models.Accounts
                 AccountTypeEnum.Cash => AccountNatureEnum.Asset,
                 AccountTypeEnum.Bank => AccountNatureEnum.Asset,
                 AccountTypeEnum.Wallet => AccountNatureEnum.Asset,
-                AccountTypeEnum.Customer => AccountNatureEnum.Asset,
                 AccountTypeEnum.RECEIVABLE => AccountNatureEnum.Asset,
 
                 // PAYABLE waa Liability (Deynta lagugu leeyahay)

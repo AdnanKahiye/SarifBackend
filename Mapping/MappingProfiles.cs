@@ -298,7 +298,9 @@ namespace Backend.Mapping
      .ForMember(dest => dest.CustomerName,
          opt => opt.MapFrom(src => src.Customer != null ? src.Customer.FullName : string.Empty))
      .ForMember(dest => dest.TransactionDescription,
-         opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.Description : string.Empty));
+         opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.Description : string.Empty))
+      .ForMember(dest => dest.CurrencyCode,
+        opt => opt.MapFrom(src => src.Currency.Code));
 
 
 
@@ -348,7 +350,12 @@ opt => opt.MapFrom(src => src.Customer != null ? src.Customer.FullName : string.
            opt => opt.MapFrom(src => src.Loan != null ? src.Loan.LoanNo : string.Empty))
 
            .ForMember(dest => dest.TransactionDescription,
-           opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.Description : string.Empty));
+           opt => opt.MapFrom(src => src.Transaction != null ? src.Transaction.Description : string.Empty))
+              .ForMember(dest => dest.CurrencyId,
+        opt => opt.MapFrom(src => src.Loan.CurrencyId))
+    .ForMember(dest => dest.CurrencyCode,
+        opt => opt.MapFrom(src => src.Loan.Currency.Code));
+            ;
 
 
 

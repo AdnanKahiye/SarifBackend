@@ -4,8 +4,6 @@ namespace Backend.DTOs.Requests.Accounts
 {
     public class CreateAccountDto
     {                  
-
-
         
         [Required]
         [MaxLength(150)]
