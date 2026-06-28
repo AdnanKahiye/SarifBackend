@@ -409,6 +409,9 @@ namespace Backend.Controllers.Accounts
             var result = await _accountService.GetCashOpeningReportAsync(fromDate, toDate);
             return StatusCode(result.StatusCode, result);
         }
+
+
+
         [HttpGet("daily-cash-report")]
         public async Task<IActionResult> GetDailyCashReport(
             DateTime? date,
