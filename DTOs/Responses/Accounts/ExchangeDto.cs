@@ -11,6 +11,7 @@
 
         public decimal Fee { get; set; }
         public decimal Profit { get; set; }
+        public decimal ProfitInToCurrency { get; set; }
 
         public Guid TransactionId { get; set; }
         public string Reference { get; set; }

@@ -30,5 +30,12 @@
         public string? UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
 
+        // Customer totals
+        public decimal TotalDeposited { get; set; }
+
+        public decimal WithdrawAmount { get; set; }
+
+        public decimal Balance { get; set; }
+
     }
 }

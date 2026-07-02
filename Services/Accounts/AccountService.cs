@@ -579,10 +579,18 @@ namespace Backend.Services.Accounts
             if (dto == null)
                 return await ResponseWrapper<Guid>.FailureAsync("Exchange required");
 
+            if (dto.CustomerRate <= 0)
+            {
+                return await ResponseWrapper<Guid>.FailureAsync(
+                    "Customer rate must be greater than zero"
+                );
+            }
+
             var rates = await GetRates(dto.FromCurrencyId, dto.ToCurrencyId);
 
             var fromRate = rates[dto.FromCurrencyId];
             var toRate = rates[dto.ToCurrencyId];
+            var agencyRate = toRate / fromRate;
 
             // ✅ Base conversion (USD base)
             var baseAmount = dto.FromAmount / fromRate;
@@ -591,22 +599,57 @@ namespace Backend.Services.Accounts
             var grossToAmount = baseAmount * toRate;
 
             // 🔥 Get settings
-            var settings = await GetExchangeSettings(dto.ToCurrencyId);
+            //var settings = await GetExchangeSettings(dto.ToCurrencyId);
 
-            // 🔥 Calculate fee & profit (BASE currency)
-            //var fee = baseAmount * settings.FeeRate;
-            //var profit = baseAmount * settings.ProfitRate;
+            //// 🔥 Calculate fee & profit (BASE currency)
+            ////var fee = baseAmount * settings.FeeRate;
+            ////var profit = baseAmount * settings.ProfitRate;
 
-            var fee = baseAmount * (settings.FeeRate / 100m);
-            var profit = baseAmount * (settings.ProfitRate / 100m);
+            //var fee = baseAmount * (settings.FeeRate / 100m);
+            //var profit = baseAmount * (settings.ProfitRate / 100m);
 
-            var totalRevenue = fee + profit;
+            //var totalRevenue = fee + profit;
 
-            // 🔥 Convert revenue to target currency
-            var revenueInToCurrency = totalRevenue * toRate;
+            //// 🔥 Convert revenue to target currency
+            //var revenueInToCurrency = totalRevenue * toRate;
 
-            // ✅ Final amount (what customer gets)
-            var finalAmount = grossToAmount - revenueInToCurrency;
+            //// ✅ Final amount (what customer gets)
+            //var finalAmount = grossToAmount - revenueInToCurrency;
+
+
+
+            // Lacagta macmiilka la siinayo
+            var finalAmount = decimal.Round(
+                dto.FromAmount * dto.CustomerRate,
+                2,
+                MidpointRounding.AwayFromZero
+            );
+
+            // Faa'iidada ka dhalatay farqiga labada rate
+            var revenueInToCurrency = decimal.Round(
+                grossToAmount - finalAmount,
+                2,
+                MidpointRounding.AwayFromZero
+            );
+
+            // Hubi in transaction-ku khasaaro keenin
+            if (revenueInToCurrency < 0)
+            {
+                return await ResponseWrapper<Guid>.FailureAsync(
+                    $"Customer rate causes a loss. Agency rate is {agencyRate}"
+                );
+            }
+
+            // Fee hadda lama isticmaalayo
+           
+
+            // Profit-ka base currency, USD
+            var profit = revenueInToCurrency / toRate;
+
+            // Waxaa loo hayaa code-ka dambe
+            var totalRevenue = revenueInToCurrency;
+
+
 
             if (finalAmount <= 0)
                 return await ResponseWrapper<Guid>.FailureAsync("Invalid exchange calculation");
@@ -679,8 +722,8 @@ namespace Backend.Services.Accounts
                     FromAmount = dto.FromAmount,
                     ToAmount = grossToAmount, // before fee
                     NetAmount = finalAmount,
-                    Rate = toRate,
-                    Fee = fee,
+                    Rate = dto.CustomerRate,
+                    Fee = revenueInToCurrency,
                     Profit = profit,
                     AgencyId = _currentUser.AgencyId,
                     BranchId = _currentUser.BranchId,
@@ -2140,70 +2183,228 @@ namespace Backend.Services.Accounts
 
 
         public async Task<ResponseWrapper<PagedResponse<DepositDto>>> GetAllDepositsAsync(
-      int page = 1,
-      int pageSize = 10,
-      DateTime? fromDate = null,
-      DateTime? toDate = null)
+       int page = 1,
+       int pageSize = 10,
+       DateTime? fromDate = null,
+       DateTime? toDate = null)
         {
-            // 1. Guard Clauses
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
+            // 1. Guard clauses
+            if (page <= 0)
+                page = 1;
+
+            if (pageSize <= 0)
+                pageSize = 10;
+
             pageSize = Math.Min(pageSize, 100);
 
-            // 2. Role Check
+            // 2. Current user information
             var agencyId = _currentUser.AgencyId;
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             return await ExecuteWithCacheAsync(
-                // ✅ include filters in cache key
-                cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_D_P{page}_PS{pageSize}_{fromDate}_{toDate}",
+                // V2 waxaa lagu daray si cache-kii hore aan loo soo celin
+                cacheKey:
+                    $"{TransactionCacheKey}_V2_{_currentUser.UserId}_D_P{page}_PS{pageSize}_{fromDate:O}_{toDate:O}",
+
                 action: async () =>
                 {
-                    var query = _context.Deposits
+                    // 3. Main deposit query
+                    var depositQuery = _context.Deposits
                         .AsNoTracking()
                         .AsQueryable();
 
-                    // 3. Multi-tenant filter
+                    // 4. Agency filter
                     if (!isAdmin)
                     {
-                        query = query.Where(x => x.AgencyId == agencyId);
+                        depositQuery = depositQuery
+                            .Where(x => x.AgencyId == agencyId);
                     }
 
-                    // ✅ 4. FIX: Convert DateTime to UTC BEFORE using in query
+                    // 5. From-date filter
                     if (fromDate.HasValue)
                     {
                         var fromUtc = fromDate.Value.Kind == DateTimeKind.Utc
                             ? fromDate.Value
-                            : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc);
+                            : DateTime.SpecifyKind(
+                                fromDate.Value,
+                                DateTimeKind.Utc);
 
-                        query = query.Where(x => x.CreatedAt >= fromUtc);
+                        depositQuery = depositQuery
+                            .Where(x => x.CreatedAt >= fromUtc);
                     }
 
+                    // 6. To-date filter
                     if (toDate.HasValue)
                     {
-                        var endOfDay = toDate.Value.Date.AddDays(1).AddTicks(-1);
+                        var toExclusive = toDate.Value.Date.AddDays(1);
 
-                        var toUtc = endOfDay.Kind == DateTimeKind.Utc
-                            ? endOfDay
-                            : DateTime.SpecifyKind(endOfDay, DateTimeKind.Utc);
+                        var toUtc = toExclusive.Kind == DateTimeKind.Utc
+                            ? toExclusive
+                            : DateTime.SpecifyKind(
+                                toExclusive,
+                                DateTimeKind.Utc);
 
-                        query = query.Where(x => x.CreatedAt <= toUtc);
+                        depositQuery = depositQuery
+                            .Where(x => x.CreatedAt < toUtc);
                     }
 
-                    var totalRecords = await query.CountAsync();
+                    // 7. Count all filtered deposit records
+                    var totalRecords = await depositQuery.CountAsync();
 
-                    var mapped = await query
+                    // 8. Get current page deposits
+                    var deposits = await depositQuery
                         .OrderByDescending(x => x.CreatedAt)
                         .Skip((page - 1) * pageSize)
                         .Take(pageSize)
-                        .ProjectTo<DepositDto>(_mapper.ConfigurationProvider)
+                        .ProjectTo<DepositDto>(
+                            _mapper.ConfigurationProvider)
                         .ToListAsync();
 
-                    return new PagedResponse<DepositDto>(mapped, page, pageSize, totalRecords);
+                    if (deposits.Count == 0)
+                    {
+                        return new PagedResponse<DepositDto>(
+                            deposits,
+                            page,
+                            pageSize,
+                            totalRecords);
+                    }
+
+                    // 9. Customers currently displayed on this page
+                    var customerIds = deposits
+                        .Select(x => x.CustomerId)
+                        .Distinct()
+                        .ToList();
+
+                    // 10. Currencies currently displayed on this page
+                    var currencyIds = deposits
+                        .Select(x => x.CurrencyId)
+                        .Distinct()
+                        .ToList();
+
+                    // 11. All deposits for these customers and currencies
+                    var customerDepositsQuery = _context.Deposits
+                        .AsNoTracking()
+                        .Where(x =>
+                            customerIds.Contains(x.CustomerId) &&
+                            currencyIds.Contains(x.CurrencyId));
+
+                    // 12. All withdrawals for these customers and currencies
+                    var customerWithdrawalsQuery = _context.Withdraws
+                        .AsNoTracking()
+                        .Where(x =>
+                            customerIds.Contains(x.CustomerId) &&
+                            currencyIds.Contains(x.CurrencyId));
+
+                    // 13. Agency security
+                    if (!isAdmin)
+                    {
+                        customerDepositsQuery = customerDepositsQuery
+                            .Where(x => x.AgencyId == agencyId);
+
+                        customerWithdrawalsQuery = customerWithdrawalsQuery
+                            .Where(x => x.AgencyId == agencyId);
+                    }
+
+                    /*
+                     * Haddii aad leedahay cancelled ama rejected transactions,
+                     * halkan ku dar status filter-ka saxda ah.
+                     *
+                     * Tusaale:
+                     *
+                     * customerDepositsQuery = customerDepositsQuery
+                     *     .Where(x => x.Status == TransactionStatus.Completed);
+                     *
+                     * customerWithdrawalsQuery = customerWithdrawalsQuery
+                     *     .Where(x => x.Status == TransactionStatus.Completed);
+                     */
+
+                    // 14. Total deposits grouped by customer and currency
+                    var depositTotalsResult = await customerDepositsQuery
+                        .GroupBy(x => new
+                        {
+                            x.CustomerId,
+                            x.CurrencyId
+                        })
+                        .Select(group => new
+                        {
+                            group.Key.CustomerId,
+                            group.Key.CurrencyId,
+
+                            // Amount is decimal?, null becomes zero
+                            Total = group.Sum(x => x.Amount ?? 0m)
+                        })
+                        .ToListAsync();
+
+                    // 15. Total withdrawals grouped by customer and currency
+                    var withdrawalTotalsResult = await customerWithdrawalsQuery
+                        .GroupBy(x => new
+                        {
+                            x.CustomerId,
+                            x.CurrencyId
+                        })
+                        .Select(group => new
+                        {
+                            group.Key.CustomerId,
+                            group.Key.CurrencyId,
+
+                            // Amount is decimal?, null becomes zero
+                            Total = group.Sum(x => x.Amount ?? 0m)
+                        })
+                        .ToListAsync();
+
+                    // 16. Convert deposit totals to dictionary
+                    var depositTotals = depositTotalsResult
+                        .ToDictionary(
+                            x => (x.CustomerId, x.CurrencyId),
+                            x => x.Total);
+
+                    // 17. Convert withdrawal totals to dictionary
+                    var withdrawalTotals = withdrawalTotalsResult
+                        .ToDictionary(
+                            x => (x.CustomerId, x.CurrencyId),
+                            x => x.Total);
+
+                    // 18. Add totals to every deposit record
+                    foreach (var deposit in deposits)
+                    {
+                        var key = (
+                            deposit.CustomerId,
+                            deposit.CurrencyId
+                        );
+
+                        deposit.TotalDeposited =
+                            depositTotals.TryGetValue(
+                                key,
+                                out var totalDeposited)
+                                ? totalDeposited
+                                : 0m;
+
+                        deposit.WithdrawAmount =
+                            withdrawalTotals.TryGetValue(
+                                key,
+                                out var totalWithdrawn)
+                                ? totalWithdrawn
+                                : 0m;
+
+                        deposit.Balance =
+                            deposit.TotalDeposited -
+                            deposit.WithdrawAmount;
+                    }
+
+                    // 19. Return paginated response
+                    return new PagedResponse<DepositDto>(
+                        deposits,
+                        page,
+                        pageSize,
+                        totalRecords);
                 },
-                successMessageFactory: result => $"{result.Data.Count} Deposit fetched",
-                cacheMessage: "Deposit loaded from cache",
-                errorMessage: "Error fetching deposit"
+
+                successMessageFactory: result =>
+                    $"{result.Data.Count} deposits fetched",
+
+                cacheMessage: "Deposits loaded from cache",
+
+                errorMessage: "Error fetching deposits"
             );
         }
 
@@ -3080,7 +3281,7 @@ namespace Backend.Services.Accounts
             var isAdmin = _currentUser.IsInRole("Administrator");
 
             var todayStart = DateTime.UtcNow.Date;
-            var todayEnd = todayStart.AddDays(1).AddTicks(-1);
+            var todayEnd = todayStart.AddDays(1);
 
             return await ExecuteWithCacheAsync(
                 cacheKey: $"{TransactionCacheKey}_{_currentUser.UserId}_Dashboard_Cards_{todayStart:yyyyMMdd}",
@@ -3255,32 +3456,52 @@ namespace Backend.Services.Accounts
                         .Sum(x => ToBase(x.Balance, x.CurrencyId));
 
                     // 6. Daily profit in base currency: Revenue - Expense
+                    // 6. Daily profit in base currency: Revenue - Expense
                     var dailyProfitByCurrency = await transactionDetailsQuery
                         .Where(x =>
                             x.CreatedAt >= todayStart &&
-                            x.CreatedAt <= todayEnd
+                            x.CreatedAt < todayEnd
                         )
                         .GroupBy(x => x.CurrencyId)
                         .Select(g => new
                         {
                             CurrencyId = g.Key,
 
-                            Revenue = g.Where(x =>
-                                    x.Account.Nature == AccountNatureEnum.Revenue &&
-                                    x.EntryType == 2
-                                )
-                                .Sum(x => (decimal?)x.Amount) ?? 0,
+                            Revenue = Math.Round(
+                                g.Where(x =>
+                                        x.Account.Nature == AccountNatureEnum.Revenue &&
+                                        x.EntryType == 2
+                                    )
+                                    .Sum(x =>
+                                        (decimal?)Math.Round(x.Amount, 2)
+                                    ) ?? 0m,
+                                2
+                            ),
 
-                            Expense = g.Where(x =>
-                                    x.Account.Nature == AccountNatureEnum.Expense &&
-                                    x.EntryType == 1
-                                )
-                                .Sum(x => (decimal?)x.Amount) ?? 0
+                            Expense = Math.Round(
+                                g.Where(x =>
+                                        x.Account.Nature == AccountNatureEnum.Expense &&
+                                        x.EntryType == 1
+                                    )
+                                    .Sum(x =>
+                                        (decimal?)Math.Round(x.Amount, 2)
+                                    ) ?? 0m,
+                                2
+                            )
                         })
                         .ToListAsync();
 
-                    var dailyProfitBase = dailyProfitByCurrency
-                        .Sum(x => ToBase(x.Revenue - x.Expense, x.CurrencyId));
+                    decimal dailyProfitBase = 0m;
+
+                    foreach (var item in dailyProfitByCurrency)
+                    {
+                        var profit = checked(item.Revenue - item.Expense);
+
+                        dailyProfitBase = checked(
+                            dailyProfitBase +
+                            ToBase(profit, item.CurrencyId)
+                        );
+                    }
 
                     // 7. Today transaction count
                     var transactionsQuery = _context.Transactions

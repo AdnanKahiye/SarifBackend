@@ -19,5 +19,9 @@ namespace Backend.DTOs.Requests.Accounts
 
         [Required]
         public int ToCurrencyId { get; set; } = 0;
+
+        [Required]
+        [Range(0.000001, double.MaxValue)]
+        public decimal CustomerRate { get; set; }
     }
 }
